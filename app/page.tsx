@@ -46,26 +46,25 @@ export default function DaytonaHub() {
         let sumNuevos = 0;
         let sumSeminuevos = 0;
 
-        // --- CEREBRO 1: LECTOR CSV DE POSTVENTA ---
-        const fetchPostventa = new Promise((resolve) => {
-          Papa.parse(URL_POSTVENTA_CSV, {
-            download: true,
-            header: true,
-            complete: (results) => {
-              const data = results.data || [];
-              sumPostventa = data.filter(d => d.KPI === 'Venta Total').reduce((sum, item) => sum + limpiarNumero(item.Valor), 0);
-              resolve();
-            },
-            error: () => resolve()
-          });
-        });
+        // --- CEREBRO 1: LECTOR CSV DE POSTVENTA (A PRUEBA DE VERCEL/CORS) ---
+        const fetchPostventa = async () => {
+          try {
+            const res = await fetch(URL_POSTVENTA_CSV);
+            const text = await res.text();
+            // Lo leemos localmente para brincar la seguridad de Google
+            const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+            const data = parsed.data || [];
+            sumPostventa = data.filter(d => d.KPI === 'Venta Total').reduce((sum, item) => sum + limpiarNumero(item.Valor), 0);
+          } catch (e) {
+            console.error("Error CSV Postventa", e);
+          }
+        };
 
         // --- CEREBRO 2: LECTOR API GOOGLE (NUEVOS) ---
         const fetchNuevos = async () => {
           try {
             const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ID_NUEVOS}?key=${API_KEY}`);
             const meta = await metaRes.json();
-            // Filtramos solo las hojas de 2026
             const sheets2026 = meta.sheets.map(s => s.properties.title).filter(name => name.endsWith(' 26') || name.includes(' 26'));
 
             for (const sheetName of sheets2026) {
@@ -106,7 +105,7 @@ export default function DaytonaHub() {
         };
 
         // Ejecutar los 3 cerebros en paralelo
-        await Promise.all([fetchPostventa, fetchNuevos(), fetchSeminuevos()]);
+        await Promise.all([fetchPostventa(), fetchNuevos(), fetchSeminuevos()]);
 
         setTotales({
           postventa: sumPostventa,
@@ -263,7 +262,7 @@ export default function DaytonaHub() {
 
           </div>
         ) : (
-          /* MODO IFRAME (Carga el Dashboard Seleccionado) */
+          /* MODO IFRAME */
           <>
             <div className="absolute inset-0 flex flex-col items-center justify-center -z-10 bg-gray-50">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003366] mb-4"></div>
