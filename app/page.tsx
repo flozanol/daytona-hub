@@ -1,133 +1,21 @@
 // @ts-nocheck
 'use client';
 
-import { useState, useEffect } from 'react';
-import Papa from 'papaparse';
-import { Car, Key, Wrench, Megaphone, LayoutDashboard, Activity, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Zap, Target, ArrowRight } from 'lucide-react';
 
 export default function DaytonaHub() {
   const [activeTab, setActiveTab] = useState('resumen');
 
-  const [loadingDatos, setLoadingDatos] = useState(true);
-  const [totales, setTotales] = useState({
-    postventa: 0,
-    nuevos: 0,
-    seminuevos: 0
-  });
-
-  // Credenciales Maestras extraídas de tu código
-  const API_KEY = "AIzaSyATBI8jMV1AtfsjhmwEwfOMYSdKmhMM5ck";
-  const ID_NUEVOS = "1SeZxO6ggsUUS_bsI_XWYv-RGLe1lyHNhMrppAXSBR9Y";
-  const ID_SEMINUEVOS = "1r3_CS8eu9MQz6Zwx0x95xwrHb-xSw1-R7m1aqsEAcQQ";
-  const URL_POSTVENTA_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTwcS4mh6qN2rqhcrnuBEssd5GIsEiXAp242OuqK9tuxEZfR_xRRJszCRbiDTUJIzbOwpkJpa4kqI4_/pub?gid=1096001978&single=true&output=csv";
-
   const dashboards = [
-    { id: 'resumen', name: 'Resumen Global', icon: LayoutDashboard },
-    { id: 'nuevos', name: 'Autos Nuevos', url: 'https://flozanol.github.io/daytona-autos-nuevos-kpis/', icon: Car },
-    { id: 'seminuevos', name: 'Seminuevos', url: 'https://flozanol.github.io/daytona-seminuevos-kpis/', icon: Key },
-    { id: 'postventa', name: 'Postventa', url: 'https://daytona-postventa-kpis.vercel.app/', icon: Wrench },
-    { id: 'marketing', name: 'Marketing', url: 'https://daytona-marketing-dashboard.vercel.app/', icon: Megaphone }
+    { id: 'resumen', name: 'Centro de Comando', icon: LayoutDashboard },
+    { id: 'nuevos', name: 'Autos Nuevos', url: 'https://flozanol.github.io/daytona-autos-nuevos-kpis/', icon: Car, status: 'Conectado (API Sheets)' },
+    { id: 'seminuevos', name: 'Seminuevos', url: 'https://flozanol.github.io/daytona-seminuevos-kpis/', icon: Key, status: 'Conectado (API Sheets)' },
+    { id: 'postventa', name: 'Postventa', url: 'https://daytona-postventa-kpis.vercel.app/', icon: Wrench, status: 'Conectado (CSV Hub)' },
+    { id: 'marketing', name: 'Marketing', url: 'https://daytona-marketing-dashboard.vercel.app/', icon: Megaphone, status: 'Conectado (Supabase DB)' }
   ];
 
-  // 1. Limpiador Inmortal
-  const limpiarNumero = (val) => {
-    if (typeof val === 'number') return val;
-    if (!val) return 0;
-    const num = Number(String(val).replace(/[^0-9.-]+/g, ""));
-    return isNaN(num) ? 0 : num;
-  };
-
-  useEffect(() => {
-    const cargarDatosGlobales = async () => {
-      setLoadingDatos(true);
-
-      try {
-        let sumPostventa = 0;
-        let sumNuevos = 0;
-        let sumSeminuevos = 0;
-
-        // --- CEREBRO 1: LECTOR CSV DE POSTVENTA (A PRUEBA DE VERCEL/CORS) ---
-        const fetchPostventa = async () => {
-          try {
-            const res = await fetch(URL_POSTVENTA_CSV);
-            const text = await res.text();
-            // Lo leemos localmente para brincar la seguridad de Google
-            const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-            const data = parsed.data || [];
-            sumPostventa = data.filter(d => d.KPI === 'Venta Total').reduce((sum, item) => sum + limpiarNumero(item.Valor), 0);
-          } catch (e) {
-            console.error("Error CSV Postventa", e);
-          }
-        };
-
-        // --- CEREBRO 2: LECTOR API GOOGLE (NUEVOS) ---
-        const fetchNuevos = async () => {
-          try {
-            const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ID_NUEVOS}?key=${API_KEY}`);
-            const meta = await metaRes.json();
-            const sheets2026 = meta.sheets.map(s => s.properties.title).filter(name => name.endsWith(' 26') || name.includes(' 26'));
-
-            for (const sheetName of sheets2026) {
-              const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ID_NUEVOS}/values/${encodeURIComponent(sheetName + '!A:Z')}?key=${API_KEY}`);
-              const json = await res.json();
-              if (json.values && json.values.length > 0) {
-                const rowUnidades = json.values.find(row => row.some(cell => cell && cell.toString().includes('Unidades Facturadas')));
-                if (rowUnidades) {
-                  for (let i = 1; i < rowUnidades.length; i++) {
-                    sumNuevos += limpiarNumero(rowUnidades[i]);
-                  }
-                }
-              }
-            }
-          } catch (e) { console.error("Error API Nuevos", e); }
-        };
-
-        // --- CEREBRO 3: LECTOR API GOOGLE (SEMINUEVOS) ---
-        const fetchSeminuevos = async () => {
-          try {
-            const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ID_SEMINUEVOS}?key=${API_KEY}`);
-            const meta = await metaRes.json();
-            const sheetNames = meta.sheets.map(s => s.properties.title).filter(t => !['Resumen', 'Dashboard', 'Config', 'Data'].includes(t));
-
-            for (const name of sheetNames) {
-              const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ID_SEMINUEVOS}/values/${encodeURIComponent(name + '!A:Z')}?key=${API_KEY}`);
-              const json = await res.json();
-              if (json.values && json.values.length > 0) {
-                const rowUnidades = json.values.find(row => row.some(cell => cell && cell.toString().includes('Unidades Facturadas')));
-                if (rowUnidades) {
-                  for (let i = 13; i <= 24; i++) {
-                    if (rowUnidades[i]) sumSeminuevos += limpiarNumero(rowUnidades[i]);
-                  }
-                }
-              }
-            }
-          } catch (e) { console.error("Error API Seminuevos", e); }
-        };
-
-        // Ejecutar los 3 cerebros en paralelo
-        await Promise.all([fetchPostventa(), fetchNuevos(), fetchSeminuevos()]);
-
-        setTotales({
-          postventa: sumPostventa,
-          nuevos: sumNuevos,
-          seminuevos: sumSeminuevos
-        });
-
-      } catch (error) {
-        console.error("Error global de consolidación:", error);
-      }
-
-      setLoadingDatos(false);
-    };
-
-    cargarDatosGlobales();
-  }, []);
-
   const activeApp = dashboards.find(d => d.id === activeTab);
-
-  // Formateadores visuales
-  const formatMoney = (val) => '$' + val.toLocaleString('es-MX', { maximumFractionDigits: 0 });
-  const formatUnits = (val) => val.toLocaleString('es-MX', { maximumFractionDigits: 0 }) + ' Unidades';
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#F4F6F8] overflow-hidden font-sans antialiased">
@@ -144,7 +32,7 @@ export default function DaytonaHub() {
             />
             <div className="h-8 w-px bg-white/20 hidden md:block"></div>
             <div className="hidden md:flex items-center gap-2 text-white/90">
-              <span className="font-bold tracking-widest text-sm uppercase">C-Level Hub</span>
+              <span className="font-bold tracking-widest text-sm uppercase">Business Intelligence Hub</span>
             </div>
           </div>
 
@@ -173,96 +61,82 @@ export default function DaytonaHub() {
       </header>
 
       {/* ÁREA PRINCIPAL */}
-      <main className="flex-1 w-full relative overflow-y-auto">
+      <main className="flex-1 w-full relative overflow-y-auto bg-gray-50">
 
-        {/* PANTALLA DE RESUMEN EJECUTIVO */}
+        {/* PANTALLA DE BIENVENIDA EJECUTIVA */}
         {activeTab === 'resumen' ? (
           <div className="max-w-7xl mx-auto p-6 md:p-10 animate-in fade-in duration-500">
 
-            <div className="mb-8 border-b border-gray-200 pb-6 flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-black text-[#003366] tracking-tight">Consolidado 2026</h1>
-                <p className="text-gray-500 font-medium mt-1">Sumatoria global extraída en tiempo real de las bases de datos de Grupo Daytona.</p>
-              </div>
-              <div className="bg-blue-50 text-blue-800 text-xs font-black uppercase px-4 py-2 rounded-lg tracking-widest border border-blue-100 hidden sm:block">
-                LIVE DATA SYNC
+            <div className="mb-10 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-5 text-[#003366]"><LayoutDashboard size={180} /></div>
+              <div className="relative z-10">
+                <span className="bg-blue-50 text-[#003366] text-xs font-black uppercase px-3 py-1.5 rounded-full tracking-widest border border-blue-100">
+                  FASE 1: Centralización Completada
+                </span>
+                <h1 className="text-4xl font-black text-[#003366] tracking-tight mt-4">Bienvenido al Portal de Inteligencia Daytona</h1>
+                <p className="text-gray-600 font-medium mt-2 max-w-3xl leading-relaxed">
+                  Hemos unificado el acceso a todos los módulos de datos del Grupo. Desde este panel superior, puede navegar instantáneamente entre los dashboards de Nuevos, Seminuevos, Postventa y Marketing, visualizando la información en vivo de cada área.
+                </p>
               </div>
             </div>
 
-            {loadingDatos ? (
-              <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-[#003366] mb-4"></div>
-                <p className="text-[#003366] font-bold tracking-widest uppercase text-sm">Escaneando Hojas de Cálculo...</p>
-                <p className="text-gray-400 text-xs mt-2">Conectando a las APIs Oficiales de Daytona</p>
+            <div className="mb-10">
+              <h2 className="text-sm font-black text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+                <Target size={18} className="text-[#fd0019]" /> Acceso Instantáneo a Datos Reales
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {dashboards.filter(d => d.id !== 'resumen').map(app => {
+                  const Icon = app.icon;
+                  return (
+                    <div
+                      key={app.id}
+                      className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-100 transition-all cursor-pointer group"
+                      onClick={() => setActiveTab(app.id)}
+                    >
+                      <div className="flex justify-between items-start mb-5">
+                        <div className="bg-blue-50 p-3 rounded-xl text-[#003366]"><Icon size={22} /></div>
+                        <ArrowRight size={20} className="text-gray-300 group-hover:text-[#fd0019] transition-colors" />
+                      </div>
+                      <h3 className="text-lg font-black text-gray-900 tracking-tight">{app.name}</h3>
+                      <p className="text-xs font-bold text-emerald-600 mt-1.5 flex items-center gap-1.5">
+                        <Database size={12} /> {app.status}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-3 font-medium">Haga clic para ver el desglose detallado e interactivo.</p>
+                    </div>
+                  )
+                })}
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            </div>
 
-                  {/* Tarjeta Autos Nuevos */}
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('nuevos')}>
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="bg-blue-50 p-3 rounded-xl text-blue-600"><Car size={24} /></div>
-                      <ArrowRight size={20} className="text-gray-300 group-hover:text-blue-600 transition-colors" />
-                    </div>
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Autos Nuevos Facturados</p>
-                    <h3 className="text-4xl font-black text-gray-800 mt-2 tracking-tighter">
-                      {totales.nuevos > 0 ? formatUnits(totales.nuevos) : '0'}
-                    </h3>
-                    <div className="absolute -bottom-6 -right-6 text-blue-50 opacity-40 group-hover:scale-110 transition-transform duration-500"><Car size={140} /></div>
+            <div className="bg-gradient-to-br from-[#003366] to-[#001a33] rounded-3xl p-8 text-white relative overflow-hidden shadow-xl border border-[#004080]">
+              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: 'calc(10 * 1px) calc(10 * 1px)' }}></div>
+              <div className="relative z-10">
+                <h3 className="text-sm font-black uppercase tracking-widest text-blue-200 mb-6 flex items-center gap-2">
+                  <Zap size={18} className="text-amber-400" /> Hoja de Ruta del Proyecto BI
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                  <div className="bg-white/5 p-6 rounded-xl border border-white/10">
+                    <span className="text-5xl">✅</span>
+                    <h4 className="font-black text-lg mt-3">Fase 1</h4>
+                    <p className="text-blue-100 text-sm mt-1">Centralizar 4 dashboards en 1 portal único.</p>
                   </div>
-
-                  {/* Tarjeta Seminuevos */}
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('seminuevos')}>
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="bg-indigo-50 p-3 rounded-xl text-indigo-600"><Key size={24} /></div>
-                      <ArrowRight size={20} className="text-gray-300 group-hover:text-indigo-600 transition-colors" />
-                    </div>
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Seminuevos Facturados</p>
-                    <h3 className="text-4xl font-black text-gray-800 mt-2 tracking-tighter">
-                      {totales.seminuevos > 0 ? formatUnits(totales.seminuevos) : '0'}
-                    </h3>
-                    <div className="absolute -bottom-6 -right-6 text-indigo-50 opacity-40 group-hover:scale-110 transition-transform duration-500"><Key size={140} /></div>
+                  <div className="bg-white/10 p-6 rounded-xl border border-amber-300 scale-105 shadow-2xl">
+                    <span className="text-5xl">🚀</span>
+                    <h4 className="font-black text-lg mt-3 text-amber-300">Fase 2 (Siguiente)</h4>
+                    <p className="text-amber-100 text-sm mt-1">Integración y Consolidación de KPIs Globales.</p>
                   </div>
-
-                  {/* Tarjeta Postventa */}
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('postventa')}>
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="bg-emerald-50 p-3 rounded-xl text-emerald-600"><Wrench size={24} /></div>
-                      <ArrowRight size={20} className="text-gray-300 group-hover:text-emerald-600 transition-colors" />
-                    </div>
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Ingreso Postventa Histórico</p>
-                    <h3 className="text-4xl font-black text-gray-800 mt-2 tracking-tighter">{formatMoney(totales.postventa)}</h3>
-                    <div className="absolute -bottom-6 -right-6 text-emerald-50 opacity-40 group-hover:scale-110 transition-transform duration-500"><Wrench size={140} /></div>
-                  </div>
-
-                  {/* Tarjeta Marketing */}
-                  <div className="bg-gradient-to-br from-[#002244] to-[#000a14] p-6 rounded-2xl shadow-lg border border-[#003366] relative overflow-hidden group cursor-pointer" onClick={() => setActiveTab('marketing')}>
-                    <div className="flex justify-between items-start mb-4 relative z-10">
-                      <div className="bg-white/10 p-3 rounded-xl text-blue-300"><Megaphone size={24} /></div>
-                      <span className="bg-[#fd0019] text-white text-[9px] font-black uppercase px-2 py-1 rounded tracking-widest shadow-sm">Live System</span>
-                    </div>
-                    <p className="text-[11px] font-black text-blue-200/60 uppercase tracking-widest relative z-10">Marketing Digital</p>
-                    <h3 className="text-2xl font-black text-white mt-2 leading-tight relative z-10 tracking-tight">Acceder al<br />Dashboard <ArrowRight size={20} className="inline ml-1 text-[#fd0019]" /></h3>
-                    <div className="absolute -bottom-6 -right-6 text-white/5 group-hover:scale-110 transition-transform duration-500"><Activity size={140} /></div>
+                  <div className="bg-white/5 p-6 rounded-xl border border-white/10 opacity-60">
+                    <span className="text-5xl">🤖</span>
+                    <h4 className="font-black text-lg mt-3">Fase 3</h4>
+                    <p className="text-blue-100 text-sm mt-1">Alertas Automáticas y Forecast con IA.</p>
                   </div>
                 </div>
-
-                <div className="bg-gradient-to-r from-[#003366] to-[#002244] rounded-2xl shadow-lg p-8 text-center text-white relative overflow-hidden">
-                  <div className="absolute top-0 right-0 opacity-10"><LayoutDashboard size={250} /></div>
-                  <div className="relative z-10">
-                    <h2 className="text-2xl font-black mb-3 tracking-tight">Portal Corporativo V2.0</h2>
-                    <p className="text-blue-200 max-w-2xl mx-auto font-medium text-sm leading-relaxed">
-                      El sistema ha consolidado la información de <strong>todas las agencias</strong> conectándose de manera segura a la API oficial de Google Workspace y al repositorio histórico de Postventa. Seleccione una unidad de negocio en la parte superior para visualizar el desglose detallado a nivel sucursal.
-                    </p>
-                  </div>
-                </div>
-              </>
-            )}
+              </div>
+            </div>
 
           </div>
         ) : (
-          /* MODO IFRAME */
+          /* MODO IFRAME (Carga el Dashboard Seleccionado que SÍ funciona) */
           <>
             <div className="absolute inset-0 flex flex-col items-center justify-center -z-10 bg-gray-50">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003366] mb-4"></div>
