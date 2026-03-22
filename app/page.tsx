@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Zap, Target, ArrowRight } from 'lucide-react';
+import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Target, ArrowRight } from 'lucide-react';
 
 export default function DaytonaHub() {
   const [activeTab, setActiveTab] = useState('resumen');
@@ -71,7 +71,7 @@ export default function DaytonaHub() {
               <div className="absolute top-0 right-0 p-8 opacity-5 text-[#003366]"><LayoutDashboard size={180} /></div>
               <div className="relative z-10">
                 <span className="bg-blue-50 text-[#003366] text-xs font-black uppercase px-3 py-1.5 rounded-full tracking-widest border border-blue-100">
-                  FASE 1: Centralización Completada
+                  PLATAFORMA ACTIVA: Centralización Completada
                 </span>
                 <h1 className="text-4xl font-black text-[#003366] tracking-tight mt-4">Bienvenido al Portal de Inteligencia Daytona</h1>
                 <p className="text-gray-600 font-medium mt-2 max-w-3xl leading-relaxed">
@@ -108,35 +108,9 @@ export default function DaytonaHub() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-[#003366] to-[#001a33] rounded-3xl p-8 text-white relative overflow-hidden shadow-xl border border-[#004080]">
-              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: 'calc(10 * 1px) calc(10 * 1px)' }}></div>
-              <div className="relative z-10">
-                <h3 className="text-sm font-black uppercase tracking-widest text-blue-200 mb-6 flex items-center gap-2">
-                  <Zap size={18} className="text-amber-400" /> Hoja de Ruta del Proyecto BI
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                  <div className="bg-white/5 p-6 rounded-xl border border-white/10">
-                    <span className="text-5xl">✅</span>
-                    <h4 className="font-black text-lg mt-3">Fase 1</h4>
-                    <p className="text-blue-100 text-sm mt-1">Centralizar 4 dashboards en 1 portal único.</p>
-                  </div>
-                  <div className="bg-white/10 p-6 rounded-xl border border-amber-300 scale-105 shadow-2xl">
-                    <span className="text-5xl">🚀</span>
-                    <h4 className="font-black text-lg mt-3 text-amber-300">Fase 2 (Siguiente)</h4>
-                    <p className="text-amber-100 text-sm mt-1">Integración y Consolidación de KPIs Globales.</p>
-                  </div>
-                  <div className="bg-white/5 p-6 rounded-xl border border-white/10 opacity-60">
-                    <span className="text-5xl">🤖</span>
-                    <h4 className="font-black text-lg mt-3">Fase 3</h4>
-                    <p className="text-blue-100 text-sm mt-1">Alertas Automáticas y Forecast con IA.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
           </div>
         ) : (
-          /* MODO IFRAME (Carga el Dashboard Seleccionado que SÍ funciona) */
+          /* MODO IFRAME (Carga el Dashboard Seleccionado) */
           <>
             <div className="absolute inset-0 flex flex-col items-center justify-center -z-10 bg-gray-50">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003366] mb-4"></div>
