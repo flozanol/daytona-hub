@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Target, ArrowRight } from 'lucide-react';
+import MinutaBoard from '../components/MinutaBoard';
 
 export default function DaytonaHub() {
   const [activeTab, setActiveTab] = useState('resumen');
@@ -107,6 +108,9 @@ export default function DaytonaHub() {
                 })}
               </div>
             </div>
+
+            {/* MINUTAS BOARD */}
+            <MinutaBoard />
 
           </div>
         ) : (
