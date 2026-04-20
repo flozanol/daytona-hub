@@ -1,11 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import ClinicaNuevosV2 from './ClinicaNuevosV2';
 import ClinicaNuevosBrillante from './ClinicaNuevosBrillante';
 
 export default function AutosNuevosWrapper({ activeApp }: { activeApp: any }) {
-  const [subTab, setSubTab] = useState<'dashboard' | 'clinica' | 'clinica_brillante'>('dashboard');
+  const [subTab, setSubTab] = useState<'dashboard' | 'clinica'>('dashboard');
 
   return (
     <div className="flex flex-col w-full h-full">
@@ -29,15 +28,6 @@ export default function AutosNuevosWrapper({ activeApp }: { activeApp: any }) {
         >
           Clínica de Inventario
         </button>
-        <button
-          onClick={() => setSubTab('clinica_brillante')}
-          className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${subTab === 'clinica_brillante'
-            ? 'bg-[#003366] text-white'
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-        >
-          Clínica de Inventario (Brillante)
-        </button>
       </div>
 
       {/* Contenido */}
@@ -59,10 +49,6 @@ export default function AutosNuevosWrapper({ activeApp }: { activeApp: any }) {
               />
             )}
           </>
-        ) : subTab === 'clinica' ? (
-          <div className="w-full h-full overflow-y-auto">
-            <ClinicaNuevosV2 />
-          </div>
         ) : (
           <div className="w-full h-full overflow-y-auto bg-[#F8FAFC]">
             <ClinicaNuevosBrillante />
