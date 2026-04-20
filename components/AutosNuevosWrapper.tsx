@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import ClinicaInventarioNuevos from './ClinicaInventarioNuevos';
+import ClinicaNuevosV2 from './ClinicaNuevosV2';
 
 export default function AutosNuevosWrapper({ activeApp }: { activeApp: any }) {
   const [subTab, setSubTab] = useState<'dashboard' | 'clinica'>('dashboard');
@@ -12,21 +12,19 @@ export default function AutosNuevosWrapper({ activeApp }: { activeApp: any }) {
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex gap-4 shrink-0 shadow-sm z-20">
         <button
           onClick={() => setSubTab('dashboard')}
-          className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-            subTab === 'dashboard'
+          className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${subTab === 'dashboard'
               ? 'bg-[#003366] text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
+            }`}
         >
           Dashboard KPIs
         </button>
         <button
           onClick={() => setSubTab('clinica')}
-          className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-            subTab === 'clinica'
+          className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${subTab === 'clinica'
               ? 'bg-[#003366] text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
+            }`}
         >
           Clínica de Inventario
         </button>
@@ -53,7 +51,7 @@ export default function AutosNuevosWrapper({ activeApp }: { activeApp: any }) {
           </>
         ) : (
           <div className="w-full h-full overflow-y-auto">
-             <ClinicaInventarioNuevos />
+            <ClinicaNuevosV2 />
           </div>
         )}
       </div>
