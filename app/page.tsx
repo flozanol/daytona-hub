@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Target, ArrowRight } from 'lucide-react';
 import MinutaBoard from '../components/MinutaBoard';
+import AutosNuevosWrapper from '../components/AutosNuevosWrapper';
 
 export default function DaytonaHub() {
   const [activeTab, setActiveTab] = useState('resumen');
@@ -113,6 +114,8 @@ export default function DaytonaHub() {
             <MinutaBoard />
 
           </div>
+        ) : activeTab === 'nuevos' ? (
+          <AutosNuevosWrapper activeApp={activeApp} />
         ) : (
           /* MODO IFRAME (Carga el Dashboard Seleccionado) */
           <>
