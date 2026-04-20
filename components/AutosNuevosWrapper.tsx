@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import ClinicaNuevos from './ClinicaNuevos';
+import ClinicaInventarioNuevos from './ClinicaInventarioNuevos';
 
 export default function AutosNuevosWrapper({ activeApp }: { activeApp: any }) {
   const [subTab, setSubTab] = useState<'dashboard' | 'clinica'>('dashboard');
@@ -53,7 +53,7 @@ export default function AutosNuevosWrapper({ activeApp }: { activeApp: any }) {
           </>
         ) : (
           <div className="w-full h-full overflow-y-auto">
-             <ClinicaNuevos />
+             <ClinicaInventarioNuevos />
           </div>
         )}
       </div>
