@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Edit2, ShieldAlert, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Edit2, ShieldAlert, CheckCircle2, Clock, AlertCircle, Printer, Save, X } from 'lucide-react';
 import AdminModal from './AdminModal';
 import { Minuta, getMinutas, addMinuta, deleteMinuta, updateMinuta } from '../app/actions/minutas';
 
@@ -15,6 +15,8 @@ export default function MinutaBoard() {
   
   // New Task Form State
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<Minuta>>({});
   const [newTask, setNewTask] = useState<Partial<Minuta>>({
     accion: '',
     responsable: '',
@@ -84,7 +86,7 @@ export default function MinutaBoard() {
   };
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 md:p-8 mt-10">
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 md:p-8 mt-10 print:shadow-none print:border-none print:p-0 print:mt-0">
       
       {/* Header and Filters */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -95,7 +97,7 @@ export default function MinutaBoard() {
           <p className="text-gray-500 text-sm font-medium mt-1">Lista de acuerdos y tareas a ejecutar.</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
           {['Todas', 'Ventas', 'Seminuevos', 'Postventa', 'Marketing', 'General'].map(area => (
             <button
               key={area}
@@ -113,6 +115,14 @@ export default function MinutaBoard() {
           <div className="h-6 w-px bg-gray-200 mx-1"></div>
 
           <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-300 shadow-sm transition-colors"
+          >
+            <Printer size={16} strokeWidth={3} />
+            Imprimir
+          </button>
+
+          <button
             onClick={() => setShowAddForm(!showAddForm)}
             className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 shadow-sm transition-colors"
           >
@@ -124,7 +134,7 @@ export default function MinutaBoard() {
 
       {/* Add Task Form Workflow */}
       {showAddForm && (
-        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-8 animate-in slide-in-from-top-4 fade-in duration-300">
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-8 animate-in slide-in-from-top-4 fade-in duration-300 print:hidden">
           <h3 className="text-[#003366] font-bold text-sm mb-4 uppercase tracking-wider flex items-center gap-2">
            Agregar Nuevo Acuerdo
            <ShieldAlert size={14} className="text-red-500" />
@@ -210,8 +220,9 @@ export default function MinutaBoard() {
               <th className="py-3 px-4 text-xs font-black text-gray-500 uppercase tracking-widest">Área</th>
               <th className="py-3 px-4 text-xs font-black text-gray-500 uppercase tracking-widest">Responsable</th>
               <th className="py-3 px-4 text-xs font-black text-gray-500 uppercase tracking-widest">Fecha Límite</th>
-              <th className="py-3 px-4 text-xs font-black text-gray-500 uppercase tracking-widest">Estado</th>
-              <th className="py-3 px-4 text-xs font-black text-gray-500 uppercase tracking-widest w-20 text-center">Admin</th>
+              <th className="py-3 px-4 text-xs font-black text-gray-500 uppercase tracking-widest print:hidden">Estado</th>
+              <th className="py-3 px-4 text-xs font-black text-gray-500 uppercase tracking-widest hidden print:table-cell">Estado</th>
+              <th className="py-3 px-4 text-xs font-black text-gray-500 uppercase tracking-widest w-20 text-center print:hidden">Admin</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -223,42 +234,122 @@ export default function MinutaBoard() {
               </tr>
             )}
             {filteredMinutas.map(minuta => (
-              <tr key={minuta.id} className="hover:bg-blue-50/50 transition-colors group">
-                <td className="py-3 px-4 text-sm text-gray-900 font-medium max-w-xs truncate" title={minuta.accion}>
-                  {minuta.accion}
-                </td>
-                <td className="py-3 px-4">
-                  <span className="text-xs font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded-md border border-gray-200">
-                    {minuta.area}
-                  </span>
-                </td>
-                <td className="py-3 px-4 text-sm text-gray-700 font-bold">
-                  {minuta.responsable}
-                </td>
-                <td className="py-3 px-4 text-sm text-gray-500 font-medium">
-                  {new Date(minuta.fecha_limite).toLocaleDateString()}
-                </td>
-                <td className="py-3 px-4">
-                  <select 
-                    value={minuta.estado}
-                    onChange={(e) => handleActionRequest('update', { id: minuta.id, updates: { estado: e.target.value }})}
-                    className={`text-xs font-bold px-2.5 py-1 rounded-full border outline-none cursor-pointer appearance-none ${getStatusColor(minuta.estado)}`}
-                  >
-                    <option value="Pendiente">Pendiente</option>
-                    <option value="En Progreso">En Progreso</option>
-                    <option value="Completado">Completado</option>
-                  </select>
-                </td>
-                <td className="py-3 px-4">
-                  <div className="flex justify-center items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => handleActionRequest('delete', { id: minuta.id })}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Borrar Tarea">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              editingId === minuta.id ? (
+                <tr key={minuta.id} className="bg-blue-50/30 transition-colors">
+                  <td className="py-3 px-4">
+                    <textarea 
+                      value={editFormData.accion}
+                      onChange={e => setEditFormData({...editFormData, accion: e.target.value})}
+                      className="w-full bg-white border border-gray-300 rounded-lg px-2 py-1 text-sm outline-none font-medium resize-y min-h-[60px]"
+                    />
+                  </td>
+                  <td className="py-3 px-4">
+                    <select 
+                      value={editFormData.area}
+                      onChange={e => setEditFormData({...editFormData, area: e.target.value as any})}
+                      className="w-full bg-white border border-gray-300 rounded-lg px-2 py-1 text-xs outline-none"
+                    >
+                      <option value="Ventas">Ventas</option>
+                      <option value="Seminuevos">Seminuevos</option>
+                      <option value="Postventa">Postventa</option>
+                      <option value="Marketing">Marketing</option>
+                      <option value="General">General</option>
+                    </select>
+                  </td>
+                  <td className="py-3 px-4">
+                    <input 
+                      type="text" 
+                      value={editFormData.responsable}
+                      onChange={e => setEditFormData({...editFormData, responsable: e.target.value})}
+                      className="w-full bg-white border border-gray-300 rounded-lg px-2 py-1 text-sm outline-none font-bold"
+                    />
+                  </td>
+                  <td className="py-3 px-4">
+                    <input 
+                      type="date" 
+                      value={editFormData.fecha_limite}
+                      onChange={e => setEditFormData({...editFormData, fecha_limite: e.target.value})}
+                      className="w-full bg-white border border-gray-300 rounded-lg px-2 py-1 text-sm outline-none"
+                    />
+                  </td>
+                  <td className="py-3 px-4">
+                     <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${getStatusColor(minuta.estado || 'Pendiente')}`}>
+                       {minuta.estado}
+                     </span>
+                  </td>
+                  <td className="py-3 px-4 print:hidden">
+                    <div className="flex justify-center items-center gap-2">
+                      <button 
+                         onClick={() => {
+                           handleActionRequest('update', { id: minuta.id, updates: editFormData });
+                           setEditingId(null);
+                         }}
+                         className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="Guardar">
+                         <Save size={16} />
+                      </button>
+                      <button 
+                         onClick={() => setEditingId(null)}
+                         className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition" title="Cancelar">
+                         <X size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={minuta.id} className="hover:bg-blue-50/50 transition-colors group">
+                  <td className="py-3 px-4 text-sm text-gray-900 font-medium whitespace-pre-wrap print:text-black min-w-[200px]">
+                    {minuta.accion}
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className="text-xs font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded-md border border-gray-200 print:text-black print:border-none print:p-0 print:bg-transparent">
+                      {minuta.area}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-sm text-gray-700 font-bold print:text-black">
+                    {minuta.responsable}
+                  </td>
+                  <td className="py-3 px-4 text-sm text-gray-500 font-medium print:text-black">
+                    {new Date(minuta.fecha_limite).toLocaleDateString()}
+                  </td>
+                  <td className="py-3 px-4 print:hidden">
+                    <select 
+                      value={minuta.estado}
+                      onChange={(e) => handleActionRequest('update', { id: minuta.id, updates: { estado: e.target.value }})}
+                      className={`text-xs font-bold px-2.5 py-1 rounded-full border outline-none cursor-pointer appearance-none ${getStatusColor(minuta.estado)}`}
+                    >
+                      <option value="Pendiente">Pendiente</option>
+                      <option value="En Progreso">En Progreso</option>
+                      <option value="Completado">Completado</option>
+                    </select>
+                  </td>
+                  <td className="py-3 px-4 hidden print:table-cell text-sm font-bold text-black border-l">
+                     {minuta.estado}
+                  </td>
+                  <td className="py-3 px-4 print:hidden">
+                    <div className="flex justify-center items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          setEditingId(minuta.id);
+                          setEditFormData({
+                            accion: minuta.accion,
+                            area: minuta.area,
+                            responsable: minuta.responsable,
+                            fecha_limite: minuta.fecha_limite ? new Date(minuta.fecha_limite).toISOString().split('T')[0] : '',
+                            estado: minuta.estado
+                          });
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Editar Tarea">
+                        <Edit2 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleActionRequest('delete', { id: minuta.id })}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Borrar Tarea">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
             ))}
           </tbody>
         </table>
