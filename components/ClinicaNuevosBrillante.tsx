@@ -245,7 +245,7 @@ export default function ClinicaNuevosBrillante() {
                 </div>
                 <p className="text-4xl font-black text-indigo-600 tracking-tight z-10">{pctSano}%</p>
                 <div className="text-sm text-slate-500 mt-2 font-bold flex items-center gap-1.5 z-10">
-                  <CheckCircle2 size={16} className="text-emerald-500" /> Unidades < 60 días
+                  <CheckCircle2 size={16} className="text-emerald-500" /> Unidades &lt; 60 días
                 </div>
               </div>
             </div>
