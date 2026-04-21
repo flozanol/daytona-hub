@@ -282,7 +282,7 @@ export default function ClinicaInventarioFinal() {
               <div className="bg-amber-50 p-6 rounded-[1.5rem] shadow-sm border border-amber-200 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-3 text-amber-700 mb-2 z-10">
                   <div className="p-2 bg-amber-500 text-white rounded-lg shadow-sm">
-                    <AlertTriangle size={18} className="stroke-[2.5px]" />
+                    <AlertCircle size={18} className="stroke-[2.5px]" />
                   </div>
                   <h3 className="font-black uppercase tracking-wider text-[11px]">Dinero Estancado</h3>
                 </div>
