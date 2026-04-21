@@ -201,6 +201,26 @@ export default function ClinicaInventarioFinalV4() {
     ].filter(item => item.value > 0);
   }, [stats]);
 
+  const muroData = useMemo(() => {
+    let current = tableData;
+    if (selectedAgencia !== 'Todas') {
+      current = current.filter(d => d.Sucursal === selectedAgencia);
+    }
+    
+    current = [...current].sort((a, b) => b.AntigüedadVal - a.AntigüedadVal);
+    
+    const expanded: any[] = [];
+    for (const row of current) {
+      if (expanded.length >= 10) break;
+      const cant = cleanNumber(row['Cant. Total']) || 1;
+      for (let i = 0; i < cant; i++) {
+        expanded.push(row);
+        if (expanded.length >= 10) break;
+      }
+    }
+    return expanded;
+  }, [tableData, selectedAgencia]);
+
   const filteredTable = useMemo(() => {
     let current = tableData;
     if (selectedAgencia !== 'Todas') {
@@ -419,6 +439,62 @@ export default function ClinicaInventarioFinalV4() {
                 </div>
               </div>
 
+            </div>
+
+
+
+            {/* EL MURO DE LOS LAMENTOS */}
+            <div className="bg-white overflow-hidden rounded-[1.5rem] shadow-md border border-red-200/60">
+              <div className="p-5 flex items-center gap-3 border-b border-red-100 bg-red-50/50">
+                <AlertCircle className="text-red-500" size={24} />
+                <h3 className="text-red-900 font-black text-lg uppercase tracking-tight">
+                  ⚠️ EL MURO DE LOS LAMENTOS <span className="text-red-500 text-sm font-bold ml-2">(Top Unidades Críticas)</span>
+                </h3>
+              </div>
+              <div className="overflow-x-auto bg-white">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-[#f8fafc] text-[11px] uppercase text-slate-500 font-black border-b border-slate-200">
+                    <tr>
+                      <th className="px-6 py-4">Sucursal</th>
+                      <th className="px-6 py-4">Submarca / Versión</th>
+                      <th className="px-6 py-4">Color</th>
+                      <th className="px-6 py-4 text-center">Tipo</th>
+                      <th className="px-6 py-4 text-center">Antigüedad</th>
+                      <th className="px-6 py-4 text-right">Valor Unidad</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {muroData.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-red-50/50 transition-colors group">
+                        <td className="px-6 py-4 text-slate-700 font-bold whitespace-nowrap">{row.Sucursal}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-black text-slate-900">{row.Submarca || '-'}</div>
+                          <div className="text-xs font-medium text-slate-500 max-w-[200px] truncate">{row.Versión || '-'}</div>
+                        </td>
+                        <td className="px-6 py-4 text-slate-600 font-medium">{row.Color}</td>
+                        <td className="px-6 py-4 text-center">
+                          {row.tipoCapital === 'PROPIA' && <span className="px-2.5 py-1 rounded-md text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-widest">Propia</span>}
+                          {row.tipoCapital === 'DEMO' && <span className="px-2.5 py-1 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200 uppercase tracking-widest">Demo</span>}
+                          {row.tipoCapital !== 'PROPIA' && row.tipoCapital !== 'DEMO' && <span className="text-slate-400 font-semibold text-[10px] uppercase">{row.tipoCapital}</span>}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center justify-center min-w-[3.5rem] px-3 py-1.5 bg-red-500 text-white font-black text-sm rounded-full shadow-sm shadow-red-500/30">
+                            {row.AntigüedadVal} días
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right font-black text-slate-900 whitespace-nowrap">
+                          {formatCurrency(row.CostoTotalVal / (cleanNumber(row['Cant. Total']) || 1))}
+                        </td>
+                      </tr>
+                    ))}
+                    {muroData.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-slate-400 font-bold">No hay unidades críticas registradas.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* TABLA DE DETALLE (LISTA COMPLETA) */}
