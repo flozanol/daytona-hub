@@ -2,178 +2,225 @@
 
 import React, { useState, useMemo } from 'react';
 import Papa from 'papaparse';
-import { Upload, Search, Database, AlertCircle, BarChart as BarChartIcon, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Upload, Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+const getCategoryBadge = (cat: string) => {
+  switch(cat) {
+    case 'DEMO PROPIO': return <span className="px-2.5 py-1 rounded-md text-[10px] font-black bg-pink-100 text-pink-800 border border-pink-200 uppercase tracking-widest">{cat}</span>;
+    case 'DEMO': return <span className="px-2.5 py-1 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200 uppercase tracking-widest">{cat}</span>;
+    case 'PROPIO': return <span className="px-2.5 py-1 rounded-md text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-widest">{cat}</span>;
+    case 'FINANCIADO': return <span className="px-2.5 py-1 rounded-md text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-widest">{cat}</span>;
+    default: return <span className="px-2.5 py-1 rounded-md text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-widest">{cat}</span>;
+  }
+};
 
 export default function ClinicaInventarioNuevos() {
   const [data, setData] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [globalSucursal, setGlobalSucursal] = useState('Todas');
+  const [selectedAgencia, setSelectedAgencia] = useState('Todas');
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // 1. UTILIDAD PARA LIMPIAR NÚMEROS (Quita comas, espacios, etc)
   const cleanNumber = (val: any) => {
     if (!val) return 0;
-    return parseFloat(String(val).replace(/,/g, '').replace(/\$/g, '')) || 0;
+    const cleanStr = String(val).replace(/,/g, '').replace(/\$/g, '').replace(/\s/g, '');
+    const num = parseFloat(cleanStr);
+    return isNaN(num) ? 0 : num;
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       Papa.parse(file, {
-        header: true,
+        header: false, // MAPEO ESTRICTO POR ÍNDICES
         skipEmptyLines: true,
         complete: (results) => {
-          let parsedData: any[] = [];
+          const inventarioReal: any[] = [];
           
-          results.data.forEach((row: any) => {
-            const colorStr = row['Color'] ? String(row['Color']) : '';
-            // Filtro: Color NO es nulo y NO contiene "Total"
-            if (colorStr && !colorStr.toLowerCase().includes('total')) {
-              
-              const cleanCosto = cleanNumber(row['Costo Total']);
-              const cleanAntiguedad = cleanNumber(row['Antigüedad Promedio']);
-              const cleanCant = cleanNumber(row['Cant. Total']);
+          results.data.forEach((row: any, idx: number) => {
+            if (!Array.isArray(row)) return;
 
-              const finUds = cleanNumber(row['Financiado']);
-              const finCosto = cleanNumber(row['Costo Financiados']);
-              const propUds = cleanNumber(row['Propios']);
-              const propCosto = cleanNumber(row['Costo Propios']);
-              const demUds = cleanNumber(row['Demo']);
-              const demCosto = cleanNumber(row['Costo Demo']);
-              const demPropUds = cleanNumber(row['Demo Propios']);
-              const demPropCosto = cleanNumber(row['Costo Demo Propios']);
+            const colA = String(row[0] || '').trim(); // Sucursal
+            const colB = String(row[1] || '').trim(); // Modelo
+            const colC = String(row[2] || '').trim(); // Versión
+            const colD = String(row[3] || '').trim(); // Color
 
-              let origenArr = [];
-              if (finUds > 0) origenArr.push('Financiado');
-              if (propUds > 0) origenArr.push('Propio');
-              if (demUds > 0) origenArr.push('Demo');
-              if (demPropUds > 0) origenArr.push('Demo Propio');
-              const origenStr = origenArr.join(', ') || 'N/A';
+            const bLower = colB.toLowerCase();
+            const cLower = colC.toLowerCase();
+            const dLower = colD.toLowerCase();
 
-              parsedData.push({
-                ...row,
-                'Costo Total Num': cleanCosto,
-                'Antigüedad Num': cleanAntiguedad,
-                'Cant Num': cleanCant,
-                'Financiado Uds': finUds,
-                'Financiado Costo': finCosto,
-                'Propios Uds': propUds,
-                'Propios Costo': propCosto,
-                'Demo Uds': demUds,
-                'Demo Costo': demCosto,
-                'Demo Propios Uds': demPropUds,
-                'Demo Propios Costo': demPropCosto,
-                'OrigenStr': origenStr
-              });
+            // Evitar cabeceras del CSV
+            if (bLower === 'submarca' || bLower === 'modelo' || bLower === 'etiquetas de fila' || bLower === '') return;
+
+            // IGNORAR FILAS DE "TOTAL" (Columna B, C, D)
+            if (bLower.includes('total') || cLower.includes('total') || dLower.includes('total') || dLower === 'sin clasificar') {
+              return; 
             }
+
+            // MAPEO ESTRICTO
+            const uFin = cleanNumber(row[5]);     // F: Unidades Financiadas
+            const mFin = cleanNumber(row[6]);     // G: Monto Financiadas
+            
+            const uDem = cleanNumber(row[7]);     // H: Unidades Demo
+            const mDem = cleanNumber(row[8]);     // I: Monto Demo
+            
+            const uProp = cleanNumber(row[9]);    // J: Unidades Propios
+            const mProp = cleanNumber(row[10]);   // K: Monto Propios
+            
+            const uDemProp = cleanNumber(row[11]);// L: Unidades Demo Propios
+            const mDemProp = cleanNumber(row[12]);// M: Monto Demo Propios
+            
+            const antiguedad = cleanNumber(row[13]); // N: Antigüedad
+
+            // LÓGICA DE EXPANSIÓN
+            const createUnits = (qty: number, amount: number, label: string) => {
+              if (qty > 0) {
+                const unitCost = amount / qty;
+                for (let i = 0; i < qty; i++) {
+                  inventarioReal.push({
+                    id: `${idx}-${label}-${i}`,
+                    Sucursal: colA || 'Sin Sucursal',
+                    Modelo: colB,
+                    Versión: colC,
+                    Color: colD,
+                    Días: antiguedad,
+                    Categoría: label,
+                    Costo: unitCost
+                  });
+                }
+              }
+            };
+
+            // Creamos las unidades reales separadas
+            createUnits(uFin, mFin, 'FINANCIADO');
+            createUnits(uDem, mDem, 'DEMO');
+            createUnits(uProp, mProp, 'PROPIO');
+            createUnits(uDemProp, mDemProp, 'DEMO PROPIO');
           });
           
-          setData(parsedData);
+          setData(inventarioReal);
           setIsLoaded(true);
         }
       });
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
-  };
+  const dashboardData = useMemo(() => {
+    if (selectedAgencia === 'Todas') return data;
+    return data.filter(d => d.Sucursal === selectedAgencia);
+  }, [data, selectedAgencia]);
 
-  // Obtener lista de sucursales únicas para el dropdown
-  const sucursales = useMemo(() => {
-    const s = new Set<string>();
-    data.forEach(d => {
-      if (d['Sucursal']) s.add(d['Sucursal']);
-    });
-    return Array.from(s).sort();
+  const agenciasUnicas = useMemo(() => {
+    const set = new Set<string>();
+    data.forEach(d => set.add(d.Sucursal || 'Desconocida'));
+    return ['Todas', ...Array.from(set).sort()];
   }, [data]);
 
-  // Datos filtrados globalmente (Sucursal)
-  const sucursalFilteredData = useMemo(() => {
-    if (globalSucursal === 'Todas') return data;
-    return data.filter(d => d['Sucursal'] === globalSucursal);
-  }, [data, globalSucursal]);
+  // STATS Y BUCKETS FINANCIEROS
+  const stats = useMemo(() => {
+    let totInversion = 0;
+    let totPropio = 0;
+    let totFin = 0;
+    let totDem = 0;
+    let totDemProp = 0;
 
-  // KPIs
-  const totalUnidades = sucursalFilteredData.reduce((acc, curr) => acc + curr['Cant Num'], 0);
-  const inversionTotal = sucursalFilteredData.reduce((acc, curr) => acc + curr['Costo Total Num'], 0);
-  const edadPromedio = sucursalFilteredData.length > 0 
-    ? (sucursalFilteredData.reduce((acc, curr) => acc + curr['Antigüedad Num'], 0) / sucursalFilteredData.length).toFixed(1)
-    : 0;
+    dashboardData.forEach(d => {
+      totInversion += d.Costo;
+      if (d.Categoría === 'PROPIO') totPropio += d.Costo;
+      if (d.Categoría === 'FINANCIADO') totFin += d.Costo;
+      if (d.Categoría === 'DEMO') totDem += d.Costo;
+      if (d.Categoría === 'DEMO PROPIO') totDemProp += d.Costo;
+    });
 
-  // KPIs Financieros Separados
-  const sumFinCosto = sucursalFilteredData.reduce((acc, curr) => acc + curr['Financiado Costo'], 0);
-  const sumPropCosto = sucursalFilteredData.reduce((acc, curr) => acc + curr['Propios Costo'], 0);
-  const sumDemCosto = sucursalFilteredData.reduce((acc, curr) => acc + curr['Demo Costo'], 0);
-  const sumDemPropCosto = sucursalFilteredData.reduce((acc, curr) => acc + curr['Demo Propios Costo'], 0);
+    return {
+      unidades: dashboardData.length,
+      inversion: totInversion,
+      capitalPropio: totPropio + totDemProp, // K + M
+      financiado: totFin,
+      propio: totPropio,
+      demo: totDem, // I (no se mezcla con M)
+      demoPropio: totDemProp
+    };
+  }, [dashboardData]);
 
-  // Aging Histogram
+  // BUCKETS DE EDAD
   const agingData = useMemo(() => {
     let a0_30 = 0, a31_60 = 0, a61_90 = 0, a90plus = 0;
-    sucursalFilteredData.forEach(d => {
-      const e = d['Antigüedad Num'];
-      const c = d['Cant Num'];
-      if(e <= 30) a0_30 += c;
-      else if(e <= 60) a31_60 += c;
-      else if(e <= 90) a61_90 += c;
-      else a90plus += c;
+    dashboardData.forEach(d => {
+      const e = d.Días;
+      if(e <= 30) a0_30++;
+      else if(e <= 60) a31_60++;
+      else if(e <= 90) a61_90++;
+      else a90plus++;
     });
+
     return [
-      { name: '0-30 días', value: a0_30, fill: '#10b981' }, // Verde
+      { name: '0-30 días', value: a0_30, fill: '#22c55e' }, // Verde
       { name: '31-60 días', value: a31_60, fill: '#eab308' }, // Amarillo
       { name: '61-90 días', value: a61_90, fill: '#f97316' }, // Naranja
       { name: '+90 días', value: a90plus, fill: '#ef4444' }, // Rojo
     ];
-  }, [sucursalFilteredData]);
+  }, [dashboardData]);
 
-  // Gráfica de Capital
-  const capitalData = useMemo(() => [
-    { name: 'Financiados', value: sumFinCosto, fill: '#3b82f6' }, // Azul
-    { name: 'Propios', value: sumPropCosto, fill: '#10b981' }, // Verde
-    { name: 'Demos', value: sumDemCosto, fill: '#8b5cf6' }, // Morado
-    { name: 'Demos Propios', value: sumDemPropCosto, fill: '#f59e0b' }, // Naranja/Amarillo
-  ], [sumFinCosto, sumPropCosto, sumDemCosto, sumDemPropCosto]);
+  // GRÁFICA DE CAPITAL (4 barras independientes)
+  const capitalData = useMemo(() => {
+    return [
+      { name: 'Financiado', value: stats.financiado, fill: '#3b82f6' },
+      { name: 'Propio', value: stats.propio, fill: '#f59e0b' },
+      { name: 'Demo', value: stats.demo, fill: '#8b5cf6' },
+      { name: 'Demo Propio', value: stats.demoPropio, fill: '#ec4899' }
+    ];
+  }, [stats]);
 
-  // Mix de Modelos (Submarca)
-  const mapModelos = useMemo(() => {
-    const m: any = {};
-    sucursalFilteredData.forEach(d => {
-      const mod = d['Submarca'] || 'Desconocido';
-      m[mod] = (m[mod] || 0) + d['Cant Num'];
-    });
-    return Object.keys(m)
-      .map(k => ({ name: k, value: m[k] }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
-  }, [sucursalFilteredData]);
+  // MURO DE LOS LAMENTOS
+  const muroLamentos = useMemo(() => {
+    const sorted = [...dashboardData].sort((a, b) => b.Días - a.Días);
+    return sorted.slice(0, 15);
+  }, [dashboardData]);
 
-  // Muro de los Lamentos (Top 10 más antiguos)
-  const muroLamentosData = useMemo(() => {
-    return [...sucursalFilteredData]
-      .sort((a, b) => b['Antigüedad Num'] - a['Antigüedad Num'])
-      .slice(0, 10);
-  }, [sucursalFilteredData]);
-
-  // Datos filtrados para tabla inferior (Text search)
-  const tableFilteredData = useMemo(() => {
-    if (!searchTerm) return sucursalFilteredData;
+  // TABLA FILTRADA
+  const tableData = useMemo(() => {
+    if (!searchTerm) return dashboardData;
     const lower = searchTerm.toLowerCase();
-    return sucursalFilteredData.filter(d => 
-      (d['Submarca'] && String(d['Submarca']).toLowerCase().includes(lower)) ||
-      (d['Sucursal'] && String(d['Sucursal']).toLowerCase().includes(lower)) ||
-      (d['Versión'] && String(d['Versión']).toLowerCase().includes(lower)) ||
-      (d['Color'] && String(d['Color']).toLowerCase().includes(lower))
+    return dashboardData.filter(d => 
+      (d.Modelo && d.Modelo.toLowerCase().includes(lower)) ||
+      (d.Versión && d.Versión.toLowerCase().includes(lower)) ||
+      (d.Color && d.Color.toLowerCase().includes(lower)) ||
+      (d.Sucursal && d.Sucursal.toLowerCase().includes(lower)) ||
+      (d.Categoría && d.Categoría.toLowerCase().includes(lower))
     );
-  }, [sucursalFilteredData, searchTerm]);
+  }, [dashboardData, searchTerm]);
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  // FORMATTERS
+  const formatCurrencyM = (value: number) => {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(2)}M`;
+    }
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
+  };
+
+  const CustomTooltipBar = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const isCurrency = payload[0].payload.name === 'Financiados' || payload[0].payload.name === 'Propios' || payload[0].payload.name === 'Demos' || payload[0].payload.name === 'Demos Propios';
+      const val = payload[0].value;
+      const color = payload[0].payload.fill;
+      
+      let displayValue = `${val}`;
+      if (label.includes('días')) {
+         displayValue = `${val} uds`;
+      } else {
+         displayValue = formatCurrency(val);
+      }
+
       return (
-        <div className="bg-white text-slate-800 p-3 rounded-xl border border-slate-200 shadow-xl text-sm z-50 relative">
+        <div className="bg-white text-slate-800 p-3 rounded-xl shadow-[0_4px_20px_rgb(0,0,0,0.08)] border border-slate-100 text-sm font-sans z-50">
           <p className="font-bold text-slate-500 mb-1">{`${label}`}</p>
-          <p className="text-xl font-black text-slate-800">
-            {isCurrency ? formatCurrency(payload[0].value) : `${payload[0].value} unidades`}
+          <p className="text-xl font-black" style={{ color }}>
+            {displayValue}
           </p>
         </div>
       );
@@ -182,103 +229,154 @@ export default function ClinicaInventarioNuevos() {
   };
 
   return (
-    <div className="min-h-full bg-slate-50 text-slate-800 p-6 md:p-10 font-sans">
+    <div className="min-h-full bg-white text-slate-800 p-6 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
         
-        {/* Cabecera y Carga */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-blue-600 pointer-events-none">
-            <Database size={150} />
-          </div>
-          <div className="relative z-10 w-full md:w-auto">
-            <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
-              <span className="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-600/30">
-                <BarChartIcon size={24} />
-              </span>
+        {/* ENCABEZADO */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+          <div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+              <Car className="text-blue-600" size={32} />
               Clínica de Inventario
             </h1>
-            <p className="text-slate-500 mt-2 font-medium">Reporte Jerárquico de Stock</p>
+            <p className="text-slate-500 text-sm font-semibold mt-1">Procesamiento Estricto por Columnas (Nuevos)</p>
           </div>
           
-          <div className="relative z-10 w-full md:w-auto flex flex-col md:flex-row gap-4">
-            {isLoaded && (
-              <div className="flex flex-col">
-                <label className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Filtro Global</label>
-                <select 
-                  className="bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-4 py-3 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
-                  value={globalSucursal}
-                  onChange={(e) => setGlobalSucursal(e.target.value)}
-                >
-                  <option value="Todas">Todas las Sucursales</option>
-                  {sucursales.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+            {isLoaded && agenciasUnicas.length > 1 && (
+              <div className="flex flex-col w-full sm:w-auto">
+                <label className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mb-1.5 ml-1 flex items-center gap-1">
+                  <Filter size={12} /> Sucursal
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedAgencia}
+                    onChange={(e) => setSelectedAgencia(e.target.value)}
+                    className="w-full sm:w-56 appearance-none bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 transition-all cursor-pointer"
+                  >
+                    {agenciasUnicas.map(ag => (
+                      <option key={ag} value={ag}>{ag}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▼</div>
+                </div>
               </div>
             )}
-            <div className="flex items-end">
-              <label className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer font-bold transition-all shadow-lg shadow-blue-600/30 w-full md:w-auto h-[46px]">
-                <Upload size={18} />
-                Cargar Archivo CSV
-                <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
-              </label>
-            </div>
+
+            <label className="flex items-center justify-center gap-2 px-6 py-2.5 mt-5 sm:mt-0 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer font-bold transition-all shadow-md w-full sm:w-auto text-sm">
+              <Upload size={18} />
+              {isLoaded ? 'Actualizar CSV' : 'Cargar Archivo'}
+              <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+            </label>
           </div>
         </div>
 
         {isLoaded && (
           <>
-            {/* KPIs */}
+            {/* CARDS SUPERIORES */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-xl relative overflow-hidden">
-                <div className="absolute -right-4 -top-4 opacity-5 text-blue-500"><TrendingUp size={100} /></div>
-                <h3 className="text-slate-500 font-bold uppercase tracking-widest text-xs mb-2 z-10">Unidades Totales</h3>
-                <p className="text-5xl font-black text-slate-800 z-10">{totalUnidades}</p>
+              
+              <div className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col justify-between hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-shadow">
+                <div className="flex items-center gap-3 text-slate-400 mb-4">
+                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                    <Database size={24} className="stroke-[2px]" />
+                  </div>
+                  <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Unidades Totales</h3>
+                </div>
+                <p className="text-4xl font-black text-slate-900 tracking-tight">{stats.unidades}</p>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-xl relative overflow-hidden">
-                <h3 className="text-slate-500 font-bold uppercase tracking-widest text-xs mb-2 z-10">Inversión Total</h3>
-                <p className="text-4xl font-black text-blue-600 z-10">{formatCurrency(inversionTotal)}</p>
+
+              <div className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col justify-between hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-shadow">
+                <div className="flex items-center gap-3 text-slate-400 mb-4">
+                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <BadgeDollarSign size={24} className="stroke-[2px]" />
+                  </div>
+                  <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Inversión Total</h3>
+                </div>
+                <p className="text-4xl font-black text-emerald-600 tracking-tight">{formatCurrencyM(stats.inversion)}</p>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-xl relative overflow-hidden">
-                <h3 className="text-slate-500 font-bold uppercase tracking-widest text-xs mb-2 z-10">Antigüedad Promedio</h3>
-                <p className="text-4xl font-black text-amber-500 z-10">{edadPromedio} <span className="text-lg text-slate-400 font-medium">días</span></p>
+
+              <div className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col justify-between hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-shadow relative overflow-hidden group">
+                <div className="absolute -right-6 -top-6 text-amber-50 opacity-50 group-hover:scale-110 transition-transform duration-500">
+                  <TrendingUp size={120} className="stroke-[1px]" />
+                </div>
+                <div className="flex items-center gap-3 text-amber-600 mb-4 z-10 relative">
+                  <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+                    <TrendingUp size={24} className="stroke-[2px]" />
+                  </div>
+                  <h3 className="font-bold uppercase tracking-widest text-xs">Capital Propio</h3>
+                </div>
+                <p className="text-4xl font-black text-amber-600 tracking-tight z-10 relative">{formatCurrencyM(stats.capitalPropio)}</p>
+                <div className="text-[10px] text-amber-800/60 mt-2 font-black z-10 relative uppercase tracking-widest">
+                  (Propios + Demo Propios)
+                </div>
               </div>
             </div>
 
-            {/* Separación de Estatus Financiero */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 flex flex-col shadow-sm">
-                <h4 className="text-blue-600 font-bold text-xs uppercase tracking-wider mb-1">Financiados</h4>
-                <p className="text-xl font-black text-slate-800">{formatCurrency(sumFinCosto)}</p>
+            {/* MURO DE LOS LAMENTOS */}
+            {muroLamentos.length > 0 && (
+              <div className="bg-white p-6 rounded-3xl border-2 border-red-500 shadow-[0_8px_30px_rgb(239,68,68,0.15)] relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-400"></div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-red-100 text-red-600 rounded-xl">
+                    <ShieldAlert size={24} className="stroke-[2px]" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Muro de los Lamentos</h2>
+                    <p className="text-sm font-semibold text-slate-500">Top 15 unidades más antiguas de inventario real</p>
+                  </div>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-slate-50 text-[11px] uppercase text-slate-500 font-black border-b border-slate-100">
+                      <tr>
+                        <th className="px-4 py-3 rounded-tl-lg">Sucursal</th>
+                        <th className="px-4 py-3">Modelo</th>
+                        <th className="px-4 py-3">Versión</th>
+                        <th className="px-4 py-3">Color</th>
+                        <th className="px-4 py-3 text-center">Días</th>
+                        <th className="px-4 py-3 text-center rounded-tr-lg">Categoría</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {muroLamentos.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-red-50/50 transition-colors">
+                          <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">{row.Sucursal}</td>
+                          <td className="px-4 py-3 font-black text-slate-900">{row.Modelo || '-'}</td>
+                          <td className="px-4 py-3 text-xs font-medium text-slate-500 max-w-[200px] truncate" title={row.Versión}>{row.Versión || '-'}</td>
+                          <td className="px-4 py-3 text-slate-600 font-medium">{row.Color}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="font-black text-red-600 bg-red-100 px-2 py-1 rounded-md">{row.Días} días</span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {getCategoryBadge(row.Categoría)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 flex flex-col shadow-sm">
-                <h4 className="text-emerald-600 font-bold text-xs uppercase tracking-wider mb-1">Propios</h4>
-                <p className="text-xl font-black text-slate-800">{formatCurrency(sumPropCosto)}</p>
-              </div>
-              <div className="bg-purple-50 p-5 rounded-2xl border border-purple-100 flex flex-col shadow-sm">
-                <h4 className="text-purple-600 font-bold text-xs uppercase tracking-wider mb-1">Demos</h4>
-                <p className="text-xl font-black text-slate-800">{formatCurrency(sumDemCosto)}</p>
-              </div>
-              <div className="bg-amber-50 p-5 rounded-2xl border border-amber-100 flex flex-col shadow-sm">
-                <h4 className="text-amber-600 font-bold text-xs uppercase tracking-wider mb-1">Demos Propios</h4>
-                <p className="text-xl font-black text-slate-800">{formatCurrency(sumDemPropCosto)}</p>
-              </div>
-            </div>
+            )}
 
-            {/* Charts Row 1 */}
+            {/* GRÁFICAS */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
-              {/* Aging */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl">
-                <h3 className="text-slate-800 font-black text-lg mb-6 flex items-center gap-2">
-                  Histograma de Aging (Días)
-                </h3>
-                <div className="h-[300px] w-full">
+              {/* AGING CHART */}
+              <div className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
+                <div className="flex items-center gap-2 mb-6">
+                  <Clock className="text-slate-400" size={20} />
+                  <h3 className="text-slate-900 font-black text-lg">Distribución por Antigüedad</h3>
+                </div>
+                <div className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={agingData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                      <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip cursor={{fill: '#f1f5f9', opacity: 0.8}} content={<CustomTooltip />} />
-                      <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    <BarChart data={agingData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="name" stroke="#64748b" fontSize={11} fontFamily="inherit" fontWeight={700} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#64748b" fontSize={11} fontFamily="inherit" fontWeight={700} tickLine={false} axisLine={false} />
+                      <Tooltip cursor={{fill: '#f8fafc'}} content={<CustomTooltipBar />} />
+                      <Bar dataKey="value" radius={[6, 6, 6, 6]}>
                         {agingData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
@@ -288,17 +386,28 @@ export default function ClinicaInventarioNuevos() {
                 </div>
               </div>
 
-              {/* Capital Stack */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl">
-                <h3 className="text-slate-800 font-black text-lg mb-6">Dinero Estancado por Estatus</h3>
-                <div className="h-[300px] w-full">
+              {/* CAPITAL CHART */}
+              <div className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
+                <div className="flex items-center gap-2 mb-6">
+                  <BarChart3 className="text-slate-400" size={20} />
+                  <h3 className="text-slate-900 font-black text-lg">Inversión por Capital</h3>
+                </div>
+                <div className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={capitalData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                      <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val/1000000}M`} />
-                      <Tooltip cursor={{fill: '#f1f5f9', opacity: 0.8}} content={<CustomTooltip />} />
-                      <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    <BarChart data={capitalData} margin={{ top: 10, right: 0, left: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="name" stroke="#64748b" fontSize={11} fontFamily="inherit" fontWeight={700} tickLine={false} axisLine={false} />
+                      <YAxis 
+                        stroke="#64748b" 
+                        fontSize={11} 
+                        fontFamily="inherit" 
+                        fontWeight={700} 
+                        tickLine={false} 
+                        axisLine={false}
+                        tickFormatter={(val) => val >= 1000000 ? `$${(val / 1000000).toFixed(0)}M` : `$${val/1000}k`}
+                      />
+                      <Tooltip cursor={{fill: '#f8fafc'}} content={<CustomTooltipBar />} />
+                      <Bar dataKey="value" radius={[6, 6, 6, 6]}>
                         {capitalData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
@@ -310,133 +419,76 @@ export default function ClinicaInventarioNuevos() {
 
             </div>
 
-            {/* Muro de los Lamentos & Top 10 Modelos */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* Top Modelos */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl">
-                <h3 className="text-slate-800 font-black text-lg mb-6">Top 10 Submarcas (Unidades)</h3>
-                <div className="h-[350px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={mapModelos} layout="vertical" margin={{ top: 0, right: 30, left: 20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                      <XAxis type="number" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={11} width={130} tickLine={false} axisLine={false} />
-                      <Tooltip cursor={{fill: '#f1f5f9', opacity: 0.8}} content={<CustomTooltip />} />
-                      <Bar dataKey="value" fill="#64748b" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Muro de los Lamentos */}
-              <div className="bg-red-50 p-6 rounded-2xl border border-red-100 shadow-xl flex flex-col">
-                <h3 className="text-red-700 font-black text-lg mb-4 flex items-center gap-2">
-                  <AlertTriangle size={20} className="text-red-500"/>
-                  Muro de los Lamentos (Top 10 Antiguos)
+            {/* TABLA DE DETALLE */}
+            <div className="bg-white overflow-hidden rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col min-h-[500px]">
+              <div className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-50">
+                <h3 className="text-slate-900 font-black text-xl flex items-center gap-2">
+                  <Database className="text-blue-500" size={24} />
+                  Inventario Expandido ({tableData.length})
                 </h3>
-                <div className="flex-1 overflow-auto rounded-xl border border-red-200 bg-white">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-red-100/50 text-xs uppercase text-red-800 tracking-wider sticky top-0">
-                      <tr>
-                        <th className="px-4 py-3 font-bold border-b border-red-100">Modelo</th>
-                        <th className="px-4 py-3 font-bold border-b border-red-100">Color</th>
-                        <th className="px-4 py-3 font-bold border-b border-red-100 text-center">Días</th>
-                        <th className="px-4 py-3 font-bold border-b border-red-100 text-center">Origen</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {muroLamentosData.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3 text-slate-700">
-                            <div className="font-bold">{row['Submarca'] || '-'}</div>
-                            <div className="text-[10px] text-slate-400">{row['Sucursal'] || '-'}</div>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 text-xs">{row['Color'] || '-'}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
-                              {row['Antigüedad Num']}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center text-xs font-medium text-slate-500">
-                            {row['OrigenStr']}
-                          </td>
-                        </tr>
-                      ))}
-                      {muroLamentosData.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-medium">No hay registros disponibles</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Table */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h3 className="text-slate-800 font-black text-lg">Detalle de Registros ({tableFilteredData.length})</h3>
-                <div className="relative w-full md:w-auto">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <div className="relative w-full sm:w-80">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
                     type="text"
-                    placeholder="Filtrar sucursal, submarca, versión..."
+                    placeholder="Buscar sucursal, modelo, versión..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full md:w-80 bg-slate-50 border border-slate-200 text-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl pl-11 pr-5 py-2.5 text-sm font-semibold outline-none focus:border-blue-500 transition-all shadow-sm"
                   />
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+              <div className="flex-1 overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 text-xs uppercase text-slate-500 tracking-wider">
+                  <thead className="bg-slate-50/80 text-[11px] uppercase text-slate-500 font-black border-b border-slate-100 sticky top-0 z-10">
                     <tr>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200">Sucursal</th>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200">Submarca</th>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200">Versión</th>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200">Color</th>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200 text-right">Costo Total</th>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200 text-center">Antigüedad (Días)</th>
-                      <th className="px-6 py-4 font-black border-b border-slate-200 text-center text-blue-600 bg-blue-50/50">Cantidad</th>
+                      <th className="px-6 py-4">Sucursal</th>
+                      <th className="px-6 py-4">Modelo / Versión</th>
+                      <th className="px-6 py-4">Color</th>
+                      <th className="px-6 py-4 text-center">Categoría</th>
+                      <th className="px-6 py-4 text-center">Antigüedad</th>
+                      <th className="px-6 py-4 text-right">Costo</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {tableFilteredData.slice(0, 100).map((row, idx) => {
-                      const isOld = row['Antigüedad Num'] > 70;
+                  <tbody className="divide-y divide-slate-50">
+                    {tableData.slice(0, 150).map((row, idx) => {
+                      const isAlert = row.Días > 90;
+                      
                       return (
-                        <tr key={idx} className={`hover:bg-slate-50 transition-colors ${isOld ? 'bg-red-50/50' : 'bg-white'}`}>
-                          <td className="px-6 py-3 whitespace-nowrap text-slate-600">{row['Sucursal'] || '-'}</td>
-                          <td className="px-6 py-3 font-bold text-slate-800">{row['Submarca'] || '-'}</td>
-                          <td className="px-6 py-3 text-xs text-slate-500 min-w-[200px] leading-relaxed">{row['Versión'] || '-'}</td>
-                          <td className="px-6 py-3 text-slate-600">{row['Color'] || '-'}</td>
-                          <td className="px-6 py-3 text-right font-medium text-slate-700">{formatCurrency(row['Costo Total Num'])}</td>
-                          <td className="px-6 py-3 text-center">
-                            {isOld ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200 shadow-sm">
-                                <AlertCircle size={12} />
-                                {row['Antigüedad Num']}
-                              </span>
-                            ) : (
-                              <span className="text-slate-600 font-medium">{row['Antigüedad Num']}</span>
-                            )}
+                        <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-6 py-4 text-slate-700 font-bold whitespace-nowrap">{row.Sucursal}</td>
+                          <td className="px-6 py-4">
+                            <div className="font-black text-slate-900">{row.Modelo || '-'}</div>
+                            <div className="text-xs font-medium text-slate-500 max-w-[200px] truncate" title={row.Versión}>{row.Versión || '-'}</div>
                           </td>
-                          <td className="px-6 py-3 text-center font-black text-blue-600 bg-blue-50/30 text-base">{row['Cant Num']}</td>
+                          <td className="px-6 py-4 text-slate-600 font-medium">{row.Color}</td>
+                          <td className="px-6 py-4 text-center">
+                            {getCategoryBadge(row.Categoría)}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`font-bold ${isAlert ? 'text-red-600 bg-red-50 px-2 py-1 rounded-md' : 'text-slate-700'}`}>
+                              {row.Días} <span className="text-xs font-medium opacity-70">días</span>
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right font-black text-slate-900 whitespace-nowrap">
+                            {formatCurrency(row.Costo)}
+                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-              {tableFilteredData.length > 100 && (
-                <p className="text-xs text-slate-400 mt-4 text-center font-medium">Mostrando primeros 100 de {tableFilteredData.length} registros. Usa la búsqueda para afinar.</p>
+              {tableData.length > 150 && (
+                <div className="p-4 text-center text-xs font-bold text-slate-500 bg-slate-50 border-t border-slate-100">
+                  Mostrando 150 de {tableData.length}. Filtre para ver más registros.
+                </div>
               )}
             </div>
+
           </>
         )}
+
       </div>
     </div>
   );
