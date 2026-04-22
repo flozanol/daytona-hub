@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import Papa from 'papaparse';
 import { Upload, Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 
 const getCategoryBadge = (cat: string) => {
   switch(cat) {
@@ -36,16 +36,24 @@ export default function ClinicaInventarioNuevos() {
         header: false, // MAPEO ESTRICTO POR ÍNDICES
         skipEmptyLines: true,
         complete: (results) => {
-          const inventarioReal: any[] = [];
+          const dataExpandida: any[] = [];
           
+          let lastSucursal = '';
+          let lastModelo = '';
+          let lastVersion = '';
+
           results.data.forEach((row: any, idx: number) => {
             if (!Array.isArray(row)) return;
 
-            const colA = String(row[0] || '').trim(); // Sucursal
-            const colB = String(row[2] || '').trim(); // Submarca
-            const colC = String(row[3] || '').trim(); // Versión
-            const colD = String(row[4] || '').trim(); // Color
+            const rawSucursal = String(row[0] || '').trim();
+            const rawModelo = String(row[2] || '').trim();
+            const rawVersion = String(row[3] || '').trim();
 
+            if (rawSucursal) lastSucursal = rawSucursal;
+            if (rawModelo) lastModelo = rawModelo;
+            if (rawVersion) lastVersion = rawVersion;
+
+            const colD = String(row[4] || '').trim(); // Color
             const dLower = colD.toLowerCase();
 
             // PASO A: Ignora filas donde la columna [4] (Color) esté vacía o diga "Total"
@@ -73,11 +81,11 @@ export default function ClinicaInventarioNuevos() {
               if (qty > 0) {
                 const unitCost = amount / qty;
                 for (let i = 0; i < qty; i++) {
-                  inventarioReal.push({
+                  dataExpandida.push({
                     id: `${idx}-${label}-${i}`,
-                    Sucursal: colA || 'Sin Sucursal',
-                    Modelo: colB,
-                    Versión: colC,
+                    Sucursal: lastSucursal || 'Sin Sucursal',
+                    Modelo: lastModelo,
+                    Versión: lastVersion,
                     Color: colD,
                     Días: antiguedad,
                     Categoría: label,
@@ -94,7 +102,7 @@ export default function ClinicaInventarioNuevos() {
             createUnits(uFin, mFin, 'FINANCIADO');
           });
           
-          setData(inventarioReal);
+          setData(dataExpandida);
           setIsLoaded(true);
         }
       });
@@ -387,28 +395,33 @@ export default function ClinicaInventarioNuevos() {
                   <BarChart3 className="text-slate-400" size={20} />
                   <h3 className="text-slate-900 font-black text-lg">Inversión por Capital</h3>
                 </div>
-                <div className="h-[250px] w-full">
+                <div className="h-[230px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={capitalData} margin={{ top: 10, right: 0, left: 10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="name" stroke="#64748b" fontSize={11} fontFamily="inherit" fontWeight={700} tickLine={false} axisLine={false} />
-                      <YAxis 
-                        stroke="#64748b" 
-                        fontSize={11} 
-                        fontFamily="inherit" 
-                        fontWeight={700} 
-                        tickLine={false} 
-                        axisLine={false}
-                        tickFormatter={(val) => val >= 1000000 ? `$${(val / 1000000).toFixed(0)}M` : `$${val/1000}k`}
-                      />
-                      <Tooltip cursor={{fill: '#f8fafc'}} content={<CustomTooltipBar />} />
-                      <Bar dataKey="value" radius={[6, 6, 6, 6]}>
+                    <PieChart>
+                      <Pie
+                        data={capitalData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
                         {capitalData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
-                      </Bar>
-                    </BarChart>
+                      </Pie>
+                      <Tooltip content={<CustomTooltipBar />} />
+                    </PieChart>
                   </ResponsiveContainer>
+                </div>
+                <div className="flex flex-wrap justify-center gap-3 mt-2">
+                  {capitalData.map(item => (
+                    <div key={item.name} className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }}></span>
+                      {item.name}
+                    </div>
+                  ))}
                 </div>
               </div>
 
