@@ -36,7 +36,7 @@ export default function ClinicaInventarioNuevos() {
         header: false, // MAPEO ESTRICTO POR ÍNDICES
         skipEmptyLines: true,
         complete: (results) => {
-          const dataExpandida: any[] = [];
+          const unidadesReales: any[] = [];
           
           let lastSucursal = '';
           let lastModelo = '';
@@ -46,6 +46,7 @@ export default function ClinicaInventarioNuevos() {
             if (!Array.isArray(row)) return;
 
             const rawSucursal = String(row[0] || '').trim();
+            const rawSubmarca = String(row[1] || '').trim();
             const rawModelo = String(row[2] || '').trim();
             const rawVersion = String(row[3] || '').trim();
 
@@ -54,14 +55,15 @@ export default function ClinicaInventarioNuevos() {
             if (rawVersion) lastVersion = rawVersion;
 
             const colD = String(row[4] || '').trim(); // Color
-            const dLower = colD.toLowerCase();
 
-            // PASO A: Ignora filas donde la columna [4] (Color) esté vacía o diga "Total"
-            if (colD === '' || dLower.includes('total')) {
+            // 1. FILTRADO DE SEGURIDAD:
+            // PROHIBIDO usar filas donde la columna Submarca sea 'Total' o la columna Color sea 'Total' o esté vacía.
+            const hasTotal = row.slice(0, 5).some((val: any) => String(val).toLowerCase().includes('total'));
+            if (colD === '' || hasTotal) {
               return; 
             }
 
-            // MAPEO ESTRICTO
+            // MAPEO ESTRICTO DE COLUMNAS
             const uFin = cleanNumber(row[5]);     // F: Unidades Financiadas
             const mFin = cleanNumber(row[6]);     // G: Monto Financiadas
             
@@ -76,18 +78,18 @@ export default function ClinicaInventarioNuevos() {
             
             const antiguedad = cleanNumber(row[13]); // N: Antigüedad
 
-            // LÓGICA DE EXPANSIÓN
+            // 2. EXPANSIÓN DE FILAS
             const createUnits = (qty: number, amount: number, label: string) => {
               if (qty > 0) {
                 const unitCost = amount / qty;
                 for (let i = 0; i < qty; i++) {
-                  dataExpandida.push({
+                  unidadesReales.push({
                     id: `${idx}-${label}-${i}`,
                     Sucursal: lastSucursal || 'Sin Sucursal',
                     Modelo: lastModelo,
                     Versión: lastVersion,
                     Color: colD,
-                    Días: antiguedad,
+                    Días: antiguedad, // Antigüedad: Columna N (de esa fila específica)
                     Categoría: label,
                     Costo: unitCost
                   });
@@ -95,14 +97,14 @@ export default function ClinicaInventarioNuevos() {
               }
             };
 
-            // PASO B: Creamos las unidades reales separadas
+            // Revisa las columnas F (Financiado), H (Demo), J (Propio) y L (Demo Propio)
             createUnits(uDemProp, mDemProp, 'DEMO PROPIO');
             createUnits(uProp, mProp, 'PROPIO');
             createUnits(uDem, mDem, 'DEMO');
             createUnits(uFin, mFin, 'FINANCIADO');
           });
           
-          setData(dataExpandida);
+          setData(unidadesReales);
           setIsLoaded(true);
         }
       });
@@ -172,7 +174,7 @@ export default function ClinicaInventarioNuevos() {
       { name: 'Financiado', value: stats.financiado, fill: '#3b82f6' },
       { name: 'Propio', value: stats.propio, fill: '#f59e0b' },
       { name: 'Demo', value: stats.demo, fill: '#8b5cf6' },
-      { name: 'Demo Propio', value: stats.demoPropio, fill: '#ec4899' }
+      { name: 'DEMO PROPIO', value: stats.demoPropio, fill: '#ec4899' }
     ];
   }, [stats]);
 
