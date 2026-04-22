@@ -42,19 +42,14 @@ export default function ClinicaInventarioNuevos() {
             if (!Array.isArray(row)) return;
 
             const colA = String(row[0] || '').trim(); // Sucursal
-            const colB = String(row[1] || '').trim(); // Modelo
-            const colC = String(row[2] || '').trim(); // Versión
-            const colD = String(row[3] || '').trim(); // Color
+            const colB = String(row[2] || '').trim(); // Submarca
+            const colC = String(row[3] || '').trim(); // Versión
+            const colD = String(row[4] || '').trim(); // Color
 
-            const bLower = colB.toLowerCase();
-            const cLower = colC.toLowerCase();
             const dLower = colD.toLowerCase();
 
-            // Evitar cabeceras del CSV
-            if (bLower === 'submarca' || bLower === 'modelo' || bLower === 'etiquetas de fila' || bLower === '') return;
-
-            // IGNORAR FILAS DE "TOTAL" (Columna B, C, D)
-            if (bLower.includes('total') || cLower.includes('total') || dLower.includes('total') || dLower === 'sin clasificar') {
+            // PASO A: Ignora filas donde la columna [4] (Color) esté vacía o diga "Total"
+            if (colD === '' || dLower.includes('total')) {
               return; 
             }
 
@@ -92,11 +87,11 @@ export default function ClinicaInventarioNuevos() {
               }
             };
 
-            // Creamos las unidades reales separadas
-            createUnits(uFin, mFin, 'FINANCIADO');
-            createUnits(uDem, mDem, 'DEMO');
-            createUnits(uProp, mProp, 'PROPIO');
+            // PASO B: Creamos las unidades reales separadas
             createUnits(uDemProp, mDemProp, 'DEMO PROPIO');
+            createUnits(uProp, mProp, 'PROPIO');
+            createUnits(uDem, mDem, 'DEMO');
+            createUnits(uFin, mFin, 'FINANCIADO');
           });
           
           setData(inventarioReal);
