@@ -15,99 +15,81 @@ const getCategoryBadge = (cat: string) => {
   }
 };
 
+// LÓGICA DE PROCESAMIENTO QUIRÚRGICO PARA INVENTARIO
+const processDaytonaData = (rawCsvData: any[]) => {
+  const units: any[] = [];
+  let lastSucursal = '';
+  let lastModelo = '';
+  let lastVersion = '';
+
+  rawCsvData.forEach((row) => {
+    // Mantener la jerarquía
+    const rawSucursal = String(row.Sucursal || '').trim();
+    const rawModelo = String(row.Modelo || '').trim();
+    const rawVersion = String(row.Versión || '').trim();
+    
+    if (rawSucursal) lastSucursal = rawSucursal;
+    if (rawModelo) lastModelo = rawModelo;
+    if (rawVersion) lastVersion = rawVersion;
+
+    row.Sucursal = lastSucursal;
+    row.Modelo = lastModelo;
+    row.Versión = lastVersion;
+
+    // 1. LIMPIEZA: Ignorar filas de totales y encabezados vacíos
+    if (!row.Color || row.Color === 'Total' || row.Submarca === 'Total') return;
+
+    const parseMoney = (val: any) => parseFloat(String(val).replace(/[^0-9.-]+/g, "")) || 0;
+    const antiguedad = parseInt(row['Antigüedad Promedio'] || row['Antigüedad']) || 0;
+
+    // 2. EXPANSIÓN POR CATEGORÍA (Aquí es donde salen los 17 de Acura)
+    const mapping = [
+      { qty: 'Financiado', cost: 'Costo Financiados', label: 'FINANCIADO' },
+      { qty: 'Demo', cost: 'Costo Demo', label: 'DEMO' },
+      { qty: 'Propios', cost: 'Costo Propios', label: 'PROPIO' },
+      { qty: 'Demo Propios', cost: 'Costo Demo Propios', label: 'DEMO PROPIO' }
+    ];
+
+    mapping.forEach(cat => {
+      const quantity = parseInt(row[cat.qty]) || 0;
+      const totalCost = parseMoney(row[cat.cost]);
+      
+      if (quantity > 0) {
+        for (let i = 0; i < quantity; i++) {
+          units.push({
+            ...row,
+            categoriaReal: cat.label,
+            valorIndividual: totalCost / quantity,
+            antiguedadReal: antiguedad
+          });
+        }
+      }
+    });
+  });
+
+  return units;
+};
+
 export default function ClinicaInventarioNuevos() {
   const [data, setData] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAgencia, setSelectedAgencia] = useState('Todas');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // 1. UTILIDAD PARA LIMPIAR NÚMEROS (Quita comas, espacios, etc)
-  const cleanNumber = (val: any) => {
-    if (!val) return 0;
-    const cleanStr = String(val).replace(/,/g, '').replace(/\$/g, '').replace(/\s/g, '');
-    const num = parseFloat(cleanStr);
-    return isNaN(num) ? 0 : num;
-  };
-
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       Papa.parse(file, {
-        header: false, // MAPEO ESTRICTO POR ÍNDICES
+        header: true,
         skipEmptyLines: true,
         complete: (results) => {
-          const unidadesReales: any[] = [];
-          
-          let lastSucursal = '';
-          let lastModelo = '';
-          let lastVersion = '';
-
-          results.data.forEach((row: any, idx: number) => {
-            if (!Array.isArray(row)) return;
-
-            const rawSucursal = String(row[0] || '').trim();
-            const rawSubmarca = String(row[1] || '').trim();
-            const rawModelo = String(row[2] || '').trim();
-            const rawVersion = String(row[3] || '').trim();
-
-            if (rawSucursal) lastSucursal = rawSucursal;
-            if (rawModelo) lastModelo = rawModelo;
-            if (rawVersion) lastVersion = rawVersion;
-
-            const colD = String(row[4] || '').trim(); // Color
-
-            // 1. FILTRADO DE SEGURIDAD:
-            // PROHIBIDO usar filas donde la columna Submarca sea 'Total' o la columna Color sea 'Total' o esté vacía.
-            const hasTotal = row.slice(0, 5).some((val: any) => String(val).toLowerCase().includes('total'));
-            if (colD === '' || hasTotal) {
-              return; 
-            }
-
-            // MAPEO ESTRICTO DE COLUMNAS
-            const uFin = cleanNumber(row[5]);     // F: Unidades Financiadas
-            const mFin = cleanNumber(row[6]);     // G: Monto Financiadas
-            
-            const uDem = cleanNumber(row[7]);     // H: Unidades Demo
-            const mDem = cleanNumber(row[8]);     // I: Monto Demo
-            
-            const uProp = cleanNumber(row[9]);    // J: Unidades Propios
-            const mProp = cleanNumber(row[10]);   // K: Monto Propios
-            
-            const uDemProp = cleanNumber(row[11]);// L: Unidades Demo Propios
-            const mDemProp = cleanNumber(row[12]);// M: Monto Demo Propios
-            
-            const antiguedad = cleanNumber(row[13]); // N: Antigüedad
-
-            // 2. EXPANSIÓN DE FILAS
-            const createUnits = (qty: number, amount: number, label: string) => {
-              if (qty > 0) {
-                const unitCost = amount / qty;
-                for (let i = 0; i < qty; i++) {
-                  unidadesReales.push({
-                    id: `${idx}-${label}-${i}`,
-                    Sucursal: lastSucursal || 'Sin Sucursal',
-                    Modelo: lastModelo,
-                    Versión: lastVersion,
-                    Color: colD,
-                    Días: antiguedad, // Antigüedad: Columna N (de esa fila específica)
-                    Categoría: label,
-                    Costo: unitCost
-                  });
-                }
-              }
-            };
-
-            // Revisa las columnas F (Financiado), H (Demo), J (Propio) y L (Demo Propio)
-            createUnits(uDemProp, mDemProp, 'DEMO PROPIO');
-            createUnits(uProp, mProp, 'PROPIO');
-            createUnits(uDem, mDem, 'DEMO');
-            createUnits(uFin, mFin, 'FINANCIADO');
-          });
-          
+          const unidadesReales = processDaytonaData(results.data);
           setData(unidadesReales);
           setIsLoaded(true);
         }
       });
+    }
+  };
     }
   };
 
@@ -131,11 +113,11 @@ export default function ClinicaInventarioNuevos() {
     let totDemProp = 0;
 
     dashboardData.forEach(d => {
-      totInversion += d.Costo;
-      if (d.Categoría === 'PROPIO') totPropio += d.Costo;
-      if (d.Categoría === 'FINANCIADO') totFin += d.Costo;
-      if (d.Categoría === 'DEMO') totDem += d.Costo;
-      if (d.Categoría === 'DEMO PROPIO') totDemProp += d.Costo;
+      totInversion += d.valorIndividual;
+      if (d.categoriaReal === 'PROPIO') totPropio += d.valorIndividual;
+      if (d.categoriaReal === 'FINANCIADO') totFin += d.valorIndividual;
+      if (d.categoriaReal === 'DEMO') totDem += d.valorIndividual;
+      if (d.categoriaReal === 'DEMO PROPIO') totDemProp += d.valorIndividual;
     });
 
     return {
@@ -153,7 +135,7 @@ export default function ClinicaInventarioNuevos() {
   const agingData = useMemo(() => {
     let a0_30 = 0, a31_60 = 0, a61_90 = 0, a90plus = 0;
     dashboardData.forEach(d => {
-      const e = d.Días;
+      const e = d.antiguedadReal;
       if(e <= 30) a0_30++;
       else if(e <= 60) a31_60++;
       else if(e <= 90) a61_90++;
@@ -180,7 +162,7 @@ export default function ClinicaInventarioNuevos() {
 
   // MURO DE LOS LAMENTOS
   const muroLamentos = useMemo(() => {
-    const sorted = [...dashboardData].sort((a, b) => b.Días - a.Días);
+    const sorted = [...dashboardData].sort((a, b) => b.antiguedadReal - a.antiguedadReal);
     return sorted.slice(0, 15);
   }, [dashboardData]);
 
@@ -193,7 +175,7 @@ export default function ClinicaInventarioNuevos() {
       (d.Versión && d.Versión.toLowerCase().includes(lower)) ||
       (d.Color && d.Color.toLowerCase().includes(lower)) ||
       (d.Sucursal && d.Sucursal.toLowerCase().includes(lower)) ||
-      (d.Categoría && d.Categoría.toLowerCase().includes(lower))
+      (d.categoriaReal && d.categoriaReal.toLowerCase().includes(lower))
     );
   }, [dashboardData, searchTerm]);
 
@@ -352,10 +334,10 @@ export default function ClinicaInventarioNuevos() {
                           <td className="px-4 py-3 text-xs font-medium text-slate-500 max-w-[200px] truncate" title={row.Versión}>{row.Versión || '-'}</td>
                           <td className="px-4 py-3 text-slate-600 font-medium">{row.Color}</td>
                           <td className="px-4 py-3 text-center">
-                            <span className="font-black text-red-600 bg-red-100 px-2 py-1 rounded-md">{row.Días} días</span>
+                            <span className="font-black text-red-600 bg-red-100 px-2 py-1 rounded-md">{row.antiguedadReal} días</span>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {getCategoryBadge(row.Categoría)}
+                            {getCategoryBadge(row.categoriaReal)}
                           </td>
                         </tr>
                       ))}
@@ -462,7 +444,7 @@ export default function ClinicaInventarioNuevos() {
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {tableData.slice(0, 150).map((row, idx) => {
-                      const isAlert = row.Días > 90;
+                      const isAlert = row.antiguedadReal > 90;
                       
                       return (
                         <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
@@ -473,15 +455,15 @@ export default function ClinicaInventarioNuevos() {
                           </td>
                           <td className="px-6 py-4 text-slate-600 font-medium">{row.Color}</td>
                           <td className="px-6 py-4 text-center">
-                            {getCategoryBadge(row.Categoría)}
+                            {getCategoryBadge(row.categoriaReal)}
                           </td>
                           <td className="px-6 py-4 text-center">
                             <span className={`font-bold ${isAlert ? 'text-red-600 bg-red-50 px-2 py-1 rounded-md' : 'text-slate-700'}`}>
-                              {row.Días} <span className="text-xs font-medium opacity-70">días</span>
+                              {row.antiguedadReal} <span className="text-xs font-medium opacity-70">días</span>
                             </span>
                           </td>
                           <td className="px-6 py-4 text-right font-black text-slate-900 whitespace-nowrap">
-                            {formatCurrency(row.Costo)}
+                            {formatCurrency(row.valorIndividual)}
                           </td>
                         </tr>
                       );
