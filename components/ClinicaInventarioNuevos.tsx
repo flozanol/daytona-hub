@@ -90,8 +90,6 @@ export default function ClinicaInventarioNuevos() {
       });
     }
   };
-    }
-  };
 
   const dashboardData = useMemo(() => {
     if (selectedAgencia === 'Todas') return data;
