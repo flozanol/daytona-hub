@@ -2,8 +2,11 @@
 
 import React, { useState, useMemo } from 'react';
 import Papa from 'papaparse';
-import { Upload, Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert } from 'lucide-react';
+import { Upload, Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import * as XLSX from 'xlsx';
+
+const CATEGORIAS = ['TODAS', 'FINANCIADO', 'PROPIO', 'DEMO', 'DEMO PROPIO'];
 
 const getCategoryBadge = (cat: string) => {
   switch(cat) {
@@ -15,7 +18,6 @@ const getCategoryBadge = (cat: string) => {
   }
 };
 
-// Verde (0-30) → Amarillo (31-60) → Naranja (61-90) → Rojo (+90)
 const getAgingColor = (dias: number): { bg: string; badge: string } => {
   if (dias <= 30)  return { bg: 'bg-green-50',  badge: 'bg-green-100 text-green-800 border-green-200' };
   if (dias <= 60)  return { bg: 'bg-yellow-50', badge: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
@@ -38,11 +40,29 @@ const esFilaArbol = (row: any): boolean => {
   return false;
 };
 
+const exportToExcel = (rows: any[], filename: string) => {
+  const exportData = rows.map(r => ({
+    'Sucursal':    r.Sucursal,
+    'Modelo':      r.Modelo,
+    'Versión':     r.Versión,
+    'Color':       r.Color,
+    'Categoría':   r.Categoría,
+    'Días':        r.Días,
+    'Costo':       r.Costo,
+  }));
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+  XLSX.writeFile(wb, `${filename}.xlsx`);
+};
+
 export default function ClinicaInventarioFinal() {
   const [data, setData] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAgencia, setSelectedAgencia] = useState('Todas');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [catMuro, setCatMuro] = useState('TODAS');
+  const [catTabla, setCatTabla] = useState('TODAS');
 
   const cleanNumber = (val: any) => {
     if (!val) return 0;
@@ -81,7 +101,8 @@ export default function ClinicaInventarioFinal() {
               ? costoTotalOriginal / veces
               : mFin + mProp + mDem + mDemProp;
 
-            const diasRaw = cleanNumber(row['Antigüedad Promedio']);
+            // Días como entero absoluto
+            const diasRaw = Math.round(Math.abs(cleanNumber(row['Antigüedad Promedio'])));
 
             for (let i = 0; i < veces; i++) {
               unidadesExpandidas.push({
@@ -159,17 +180,17 @@ export default function ClinicaInventarioFinal() {
     { name: 'Demo Propio', value: stats.demoPropio,  fill: '#ec4899' }
   ]), [stats]);
 
-  // MURO: solo > 45 días, top 15
+  // MURO: > 90 días, filtro categoría
   const muroLamentos = useMemo(() => {
-    return [...dashboardData]
-      .filter(d => d.Días > 45)
-      .sort((a, b) => b.Días - a.Días)
-      .slice(0, 15);
-  }, [dashboardData]);
+    let base = [...dashboardData].filter(d => d.Días > 90);
+    if (catMuro !== 'TODAS') base = base.filter(d => d.Categoría === catMuro);
+    return base.sort((a, b) => b.Días - a.Días);
+  }, [dashboardData, catMuro]);
 
-  // TABLA: ordenada por antigüedad de mayor a menor
+  // TABLA: ordenada por antigüedad desc, filtro categoría + búsqueda
   const tableData = useMemo(() => {
     let current = [...dashboardData].sort((a, b) => b.Días - a.Días);
+    if (catTabla !== 'TODAS') current = current.filter(d => d.Categoría === catTabla);
     if (!searchTerm) return current;
     const lower = searchTerm.toLowerCase();
     return current.filter(d =>
@@ -179,7 +200,7 @@ export default function ClinicaInventarioFinal() {
       (d.Sucursal  && d.Sucursal.toLowerCase().includes(lower))  ||
       (d.Categoría && d.Categoría.toLowerCase().includes(lower))
     );
-  }, [dashboardData, searchTerm]);
+  }, [dashboardData, searchTerm, catTabla]);
 
   const formatCurrencyM = (value: number) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(2)}M`;
@@ -205,6 +226,19 @@ export default function ClinicaInventarioFinal() {
     }
     return null;
   };
+
+  const FilterCat = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs font-black rounded-xl px-3 py-2 pr-7 outline-none focus:border-blue-400 transition-all cursor-pointer uppercase tracking-widest"
+      >
+        {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</div>
+    </div>
+  );
 
   return (
     <div className="min-h-full bg-slate-50 text-slate-800 p-6 md:p-8 font-sans">
@@ -319,48 +353,66 @@ export default function ClinicaInventarioFinal() {
               </div>
             </div>
 
-            {/* 3. MURO DE LOS LAMENTOS — solo > 45 días */}
-            {muroLamentos.length > 0 && (
+            {/* 3. MURO DE LOS LAMENTOS — > 90 días */}
+            {dashboardData.some(d => d.Días > 90) && (
               <div className="bg-white p-6 rounded-3xl border-2 border-red-500 shadow-md relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-400"></div>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-red-100 text-red-600 rounded-xl"><ShieldAlert size={24} className="stroke-[2px]" /></div>
-                  <div>
-                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Muro de los Lamentos</h2>
-                    <p className="text-sm font-semibold text-slate-500">Top 15 unidades con más de 45 días en inventario</p>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-100 text-red-600 rounded-xl"><ShieldAlert size={24} className="stroke-[2px]" /></div>
+                    <div>
+                      <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Muro de los Lamentos</h2>
+                      <p className="text-sm font-semibold text-slate-500">
+                        Unidades con más de 90 días en inventario
+                        {catMuro !== 'TODAS' ? ` · ${catMuro}` : ''} ({muroLamentos.length})
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <FilterCat value={catMuro} onChange={setCatMuro} />
+                    <button
+                      onClick={() => exportToExcel(muroLamentos, 'muro-lamentos')}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-widest"
+                    >
+                      <Download size={14} /> Excel
+                    </button>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 text-[11px] uppercase text-slate-500 font-black border-b border-slate-200">
-                      <tr>
-                        <th className="px-4 py-3 rounded-tl-lg">Sucursal</th>
-                        <th className="px-4 py-3">Modelo</th>
-                        <th className="px-4 py-3">Versión</th>
-                        <th className="px-4 py-3">Color</th>
-                        <th className="px-4 py-3 text-center">Días</th>
-                        <th className="px-4 py-3 text-center rounded-tr-lg">Categoría</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {muroLamentos.map((row, idx) => {
-                        const aging = getAgingColor(row.Días);
-                        return (
-                          <tr key={idx} className={`transition-colors ${aging.bg} hover:brightness-95`}>
-                            <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">{row.Sucursal}</td>
-                            <td className="px-4 py-3 font-black text-slate-900">{row.Modelo || '-'}</td>
-                            <td className="px-4 py-3 text-xs font-medium text-slate-500 max-w-[200px] truncate" title={row.Versión}>{row.Versión || '-'}</td>
-                            <td className="px-4 py-3 text-slate-600 font-medium">{row.Color}</td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`font-black px-2 py-1 rounded-md border text-xs ${aging.badge}`}>{row.Días} días</span>
-                            </td>
-                            <td className="px-4 py-3 text-center">{getCategoryBadge(row.Categoría)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                {muroLamentos.length === 0 ? (
+                  <p className="text-center text-slate-400 font-bold py-8">No hay unidades con esta categoría en el Muro.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 text-[11px] uppercase text-slate-500 font-black border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3 rounded-tl-lg">Sucursal</th>
+                          <th className="px-4 py-3">Modelo</th>
+                          <th className="px-4 py-3">Versión</th>
+                          <th className="px-4 py-3">Color</th>
+                          <th className="px-4 py-3 text-center">Días</th>
+                          <th className="px-4 py-3 text-center rounded-tr-lg">Categoría</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {muroLamentos.map((row, idx) => {
+                          const aging = getAgingColor(row.Días);
+                          return (
+                            <tr key={idx} className={`transition-colors ${aging.bg} hover:brightness-95`}>
+                              <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">{row.Sucursal}</td>
+                              <td className="px-4 py-3 font-black text-slate-900">{row.Modelo || '-'}</td>
+                              <td className="px-4 py-3 text-xs font-medium text-slate-500 max-w-[200px] truncate" title={row.Versión}>{row.Versión || '-'}</td>
+                              <td className="px-4 py-3 text-slate-600 font-medium">{row.Color}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`font-black px-2 py-1 rounded-md border text-xs ${aging.badge}`}>{row.Días} días</span>
+                              </td>
+                              <td className="px-4 py-3 text-center">{getCategoryBadge(row.Categoría)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
@@ -371,15 +423,24 @@ export default function ClinicaInventarioFinal() {
                   <Database className="text-blue-500" size={24} />
                   Inventario Expandido ({tableData.length})
                 </h3>
-                <div className="relative w-full sm:w-80">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input
-                    type="text"
-                    placeholder="Buscar sucursal, modelo, versión..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl pl-11 pr-5 py-2.5 text-sm font-semibold outline-none focus:border-blue-500 transition-all shadow-sm"
-                  />
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                  <FilterCat value={catTabla} onChange={setCatTabla} />
+                  <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      type="text"
+                      placeholder="Buscar sucursal, modelo, versión..."
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl pl-11 pr-5 py-2.5 text-sm font-semibold outline-none focus:border-blue-500 transition-all shadow-sm"
+                    />
+                  </div>
+                  <button
+                    onClick={() => exportToExcel(tableData, 'inventario-expandido')}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-widest whitespace-nowrap"
+                  >
+                    <Download size={14} /> Excel
+                  </button>
                 </div>
               </div>
               <div className="flex-1 overflow-x-auto">
@@ -422,7 +483,7 @@ export default function ClinicaInventarioFinal() {
               </div>
               {tableData.length > 150 && (
                 <div className="p-4 text-center text-xs font-bold text-slate-500 bg-slate-50 border-t border-slate-100">
-                  Mostrando 150 de {tableData.length}. Filtre para ver más registros.
+                  Mostrando 150 de {tableData.length}. Filtra por categoría o usa el buscador para ver más.
                 </div>
               )}
             </div>
