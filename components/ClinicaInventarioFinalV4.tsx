@@ -15,24 +15,26 @@ const getCategoryBadge = (cat: string) => {
   }
 };
 
-// ─── FIX #1: Helper robusto para detectar filas de árbol ───────────────────
+// Verde (0-30) → Amarillo (31-60) → Naranja (61-90) → Rojo (+90)
+const getAgingColor = (dias: number): { bg: string; badge: string } => {
+  if (dias <= 30)  return { bg: 'bg-green-50',  badge: 'bg-green-100 text-green-800 border-green-200' };
+  if (dias <= 60)  return { bg: 'bg-yellow-50', badge: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
+  if (dias <= 90)  return { bg: 'bg-orange-50', badge: 'bg-orange-100 text-orange-800 border-orange-200' };
+  return           { bg: 'bg-red-50',    badge: 'bg-red-100 text-red-800 border-red-200' };
+};
+
 const esFilaArbol = (row: any): boolean => {
   const sucursal = String(row['Sucursal'] ?? '').trim().toLowerCase();
   const subBrand = String(row['SubBrandDescrGbl'] ?? '').trim().toLowerCase();
   const submarca = String(row['Submarca'] ?? '').trim().toLowerCase();
   const version  = String(row['Versión'] ?? '').trim().toLowerCase();
   const color    = String(row['Color'] ?? '').trim().toLowerCase();
-
-  // Fila global de totales (última fila del CSV)
   if (sucursal === 'total') return true;
-  // Cualquier nivel del árbol con "Total" como valor de agrupación
   if (subBrand === 'total') return true;
   if (submarca === 'total') return true;
   if (version  === 'total') return true;
   if (color    === 'total') return true;
-  // Filas sin color (NaN) son siempre agrupadores del árbol
   if (!row['Color'] || color === '') return true;
-
   return false;
 };
 
@@ -57,37 +59,28 @@ export default function ClinicaInventarioFinal() {
         skipEmptyLines: true,
         complete: (results) => {
           const unidadesExpandidas: any[] = [];
-
           results.data.forEach((row: any, idx: number) => {
-            // ─── FIX #2: Usar helper para descartar filas de árbol ──────────
             if (esFilaArbol(row)) return;
-
             const colorStr = String(row['Color']).trim();
-
-            // ─── FIX #3: "Sin Clasificar" ahora SÍ se incluye ──────────────
-            // Son unidades reales sin color asignado, no filas de totales
-
             const cantTotal = cleanNumber(row['Cant. Total']) || 1;
             const veces = cantTotal > 0 ? cantTotal : 1;
 
             let categoria = 'OTRO';
-            if (cleanNumber(row['Demo Propios']) > 0)  categoria = 'DEMO PROPIO';
-            else if (cleanNumber(row['Demo']) > 0)     categoria = 'DEMO';
-            else if (cleanNumber(row['Propios']) > 0)  categoria = 'PROPIO';
-            else if (cleanNumber(row['Financiado']) > 0) categoria = 'FINANCIADO';
+            if (cleanNumber(row['Demo Propios']) > 0)      categoria = 'DEMO PROPIO';
+            else if (cleanNumber(row['Demo']) > 0)         categoria = 'DEMO';
+            else if (cleanNumber(row['Propios']) > 0)      categoria = 'PROPIO';
+            else if (cleanNumber(row['Financiado']) > 0)   categoria = 'FINANCIADO';
 
-            const mFin     = cleanNumber(row['Costo Financiados'])   / veces;
-            const mProp    = cleanNumber(row['Costo Propios'])        / veces;
-            const mDem     = cleanNumber(row['Costo Demo'])           / veces;
-            const mDemProp = cleanNumber(row['Costo Demo Propios'])   / veces;
+            const mFin     = cleanNumber(row['Costo Financiados'])  / veces;
+            const mProp    = cleanNumber(row['Costo Propios'])       / veces;
+            const mDem     = cleanNumber(row['Costo Demo'])          / veces;
+            const mDemProp = cleanNumber(row['Costo Demo Propios'])  / veces;
 
             const costoTotalOriginal = cleanNumber(row['Costo Total']);
             const costoUnit = costoTotalOriginal > 0
               ? costoTotalOriginal / veces
               : mFin + mProp + mDem + mDemProp;
 
-            // ─── FIX #4: Antigüedad usa el nombre exacto del CSV ────────────
-            // La columna se llama "Antigüedad Promedio", no "Antigüedad"
             const diasRaw = cleanNumber(row['Antigüedad Promedio']);
 
             for (let i = 0; i < veces; i++) {
@@ -100,22 +93,16 @@ export default function ClinicaInventarioFinal() {
                 Días:      diasRaw,
                 Categoría: categoria,
                 Costo:     costoUnit,
-                mFin,
-                mProp,
-                mDem,
-                mDemProp
+                mFin, mProp, mDem, mDemProp
               });
             }
           });
-
           setData(unidadesExpandidas);
           setIsLoaded(true);
         }
       });
     }
   };
-
-  // ── El resto del componente queda idéntico a tu versión original ──────────
 
   const dashboardData = useMemo(() => {
     if (selectedAgencia === 'Todas') return data;
@@ -172,14 +159,20 @@ export default function ClinicaInventarioFinal() {
     { name: 'Demo Propio', value: stats.demoPropio,  fill: '#ec4899' }
   ]), [stats]);
 
+  // MURO: solo > 45 días, top 15
   const muroLamentos = useMemo(() => {
-    return [...dashboardData].sort((a, b) => b.Días - a.Días).slice(0, 15);
+    return [...dashboardData]
+      .filter(d => d.Días > 45)
+      .sort((a, b) => b.Días - a.Días)
+      .slice(0, 15);
   }, [dashboardData]);
 
+  // TABLA: ordenada por antigüedad de mayor a menor
   const tableData = useMemo(() => {
-    if (!searchTerm) return dashboardData;
+    let current = [...dashboardData].sort((a, b) => b.Días - a.Días);
+    if (!searchTerm) return current;
     const lower = searchTerm.toLowerCase();
-    return dashboardData.filter(d =>
+    return current.filter(d =>
       (d.Modelo    && d.Modelo.toLowerCase().includes(lower))    ||
       (d.Versión   && d.Versión.toLowerCase().includes(lower))   ||
       (d.Color     && d.Color.toLowerCase().includes(lower))     ||
@@ -213,7 +206,6 @@ export default function ClinicaInventarioFinal() {
     return null;
   };
 
-  // ── JSX: idéntico a tu versión original ──────────────────────────────────
   return (
     <div className="min-h-full bg-slate-50 text-slate-800 p-6 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -255,7 +247,7 @@ export default function ClinicaInventarioFinal() {
 
         {isLoaded && (
           <>
-            {/* CARDS SUPERIORES */}
+            {/* 1. CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-3 text-slate-400 mb-4">
@@ -284,49 +276,7 @@ export default function ClinicaInventarioFinal() {
               </div>
             </div>
 
-            {/* MURO DE LOS LAMENTOS */}
-            {muroLamentos.length > 0 && (
-              <div className="bg-white p-6 rounded-3xl border-2 border-red-500 shadow-md relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-400"></div>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-red-100 text-red-600 rounded-xl"><ShieldAlert size={24} className="stroke-[2px]" /></div>
-                  <div>
-                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Muro de los Lamentos</h2>
-                    <p className="text-sm font-semibold text-slate-500">Top 15 unidades con mayor antigüedad</p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 text-[11px] uppercase text-slate-500 font-black border-b border-slate-200">
-                      <tr>
-                        <th className="px-4 py-3 rounded-tl-lg">Sucursal</th>
-                        <th className="px-4 py-3">Modelo</th>
-                        <th className="px-4 py-3">Versión</th>
-                        <th className="px-4 py-3">Color</th>
-                        <th className="px-4 py-3 text-center">Días</th>
-                        <th className="px-4 py-3 text-center rounded-tr-lg">Categoría</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {muroLamentos.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-red-50/50 transition-colors">
-                          <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">{row.Sucursal}</td>
-                          <td className="px-4 py-3 font-black text-slate-900">{row.Modelo || '-'}</td>
-                          <td className="px-4 py-3 text-xs font-medium text-slate-500 max-w-[200px] truncate" title={row.Versión}>{row.Versión || '-'}</td>
-                          <td className="px-4 py-3 text-slate-600 font-medium">{row.Color}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="font-black text-red-600 bg-red-100 px-2 py-1 rounded-md">{row.Días} días</span>
-                          </td>
-                          <td className="px-4 py-3 text-center">{getCategoryBadge(row.Categoría)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* GRÁFICAS */}
+            {/* 2. GRÁFICAS */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60">
                 <div className="flex items-center gap-2 mb-6">
@@ -369,7 +319,52 @@ export default function ClinicaInventarioFinal() {
               </div>
             </div>
 
-            {/* TABLA DE DETALLE */}
+            {/* 3. MURO DE LOS LAMENTOS — solo > 45 días */}
+            {muroLamentos.length > 0 && (
+              <div className="bg-white p-6 rounded-3xl border-2 border-red-500 shadow-md relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-400"></div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-red-100 text-red-600 rounded-xl"><ShieldAlert size={24} className="stroke-[2px]" /></div>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Muro de los Lamentos</h2>
+                    <p className="text-sm font-semibold text-slate-500">Top 15 unidades con más de 45 días en inventario</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-slate-50 text-[11px] uppercase text-slate-500 font-black border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3 rounded-tl-lg">Sucursal</th>
+                        <th className="px-4 py-3">Modelo</th>
+                        <th className="px-4 py-3">Versión</th>
+                        <th className="px-4 py-3">Color</th>
+                        <th className="px-4 py-3 text-center">Días</th>
+                        <th className="px-4 py-3 text-center rounded-tr-lg">Categoría</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {muroLamentos.map((row, idx) => {
+                        const aging = getAgingColor(row.Días);
+                        return (
+                          <tr key={idx} className={`transition-colors ${aging.bg} hover:brightness-95`}>
+                            <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">{row.Sucursal}</td>
+                            <td className="px-4 py-3 font-black text-slate-900">{row.Modelo || '-'}</td>
+                            <td className="px-4 py-3 text-xs font-medium text-slate-500 max-w-[200px] truncate" title={row.Versión}>{row.Versión || '-'}</td>
+                            <td className="px-4 py-3 text-slate-600 font-medium">{row.Color}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`font-black px-2 py-1 rounded-md border text-xs ${aging.badge}`}>{row.Días} días</span>
+                            </td>
+                            <td className="px-4 py-3 text-center">{getCategoryBadge(row.Categoría)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 4. INVENTARIO EXPANDIDO */}
             <div className="bg-white overflow-hidden rounded-3xl shadow-sm border border-slate-200/60 flex flex-col min-h-[500px]">
               <div className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100">
                 <h3 className="text-slate-900 font-black text-xl flex items-center gap-2">
@@ -395,15 +390,15 @@ export default function ClinicaInventarioFinal() {
                       <th className="px-6 py-4">Modelo / Versión</th>
                       <th className="px-6 py-4">Color</th>
                       <th className="px-6 py-4 text-center">Categoría</th>
-                      <th className="px-6 py-4 text-center">Antigüedad</th>
+                      <th className="px-6 py-4 text-center">Antigüedad ↓</th>
                       <th className="px-6 py-4 text-right">Costo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {tableData.slice(0, 150).map((row, idx) => {
-                      const isAlert = row.Días > 90;
+                      const aging = getAgingColor(row.Días);
                       return (
-                        <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                        <tr key={idx} className={`transition-colors ${aging.bg} hover:brightness-95`}>
                           <td className="px-6 py-4 text-slate-700 font-bold whitespace-nowrap">{row.Sucursal}</td>
                           <td className="px-6 py-4">
                             <div className="font-black text-slate-900">{row.Modelo || '-'}</div>
@@ -412,8 +407,8 @@ export default function ClinicaInventarioFinal() {
                           <td className="px-6 py-4 text-slate-600 font-medium">{row.Color}</td>
                           <td className="px-6 py-4 text-center">{getCategoryBadge(row.Categoría)}</td>
                           <td className="px-6 py-4 text-center">
-                            <span className={`font-bold ${isAlert ? 'text-red-600 bg-red-50 px-2 py-1 rounded-md' : 'text-slate-700'}`}>
-                              {row.Días} <span className="text-xs font-medium opacity-70">días</span>
+                            <span className={`font-black px-2 py-1 rounded-md border text-xs ${aging.badge}`}>
+                              {row.Días} días
                             </span>
                           </td>
                           <td className="px-6 py-4 text-right font-black text-slate-900 whitespace-nowrap">
