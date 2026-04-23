@@ -15,13 +15,33 @@ const getCategoryBadge = (cat: string) => {
   }
 };
 
+// ─── FIX #1: Helper robusto para detectar filas de árbol ───────────────────
+const esFilaArbol = (row: any): boolean => {
+  const sucursal = String(row['Sucursal'] ?? '').trim().toLowerCase();
+  const subBrand = String(row['SubBrandDescrGbl'] ?? '').trim().toLowerCase();
+  const submarca = String(row['Submarca'] ?? '').trim().toLowerCase();
+  const version  = String(row['Versión'] ?? '').trim().toLowerCase();
+  const color    = String(row['Color'] ?? '').trim().toLowerCase();
+
+  // Fila global de totales (última fila del CSV)
+  if (sucursal === 'total') return true;
+  // Cualquier nivel del árbol con "Total" como valor de agrupación
+  if (subBrand === 'total') return true;
+  if (submarca === 'total') return true;
+  if (version  === 'total') return true;
+  if (color    === 'total') return true;
+  // Filas sin color (NaN) son siempre agrupadores del árbol
+  if (!row['Color'] || color === '') return true;
+
+  return false;
+};
+
 export default function ClinicaInventarioFinal() {
   const [data, setData] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAgencia, setSelectedAgencia] = useState('Todas');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // 1. UTILIDAD PARA LIMPIAR NÚMEROS ESTRICTAMENTE
   const cleanNumber = (val: any) => {
     if (!val) return 0;
     const cleanStr = String(val).replace(/,/g, '').replace(/\$/g, '').replace(/\s/g, '');
@@ -37,57 +57,65 @@ export default function ClinicaInventarioFinal() {
         skipEmptyLines: true,
         complete: (results) => {
           const unidadesExpandidas: any[] = [];
-          
+
           results.data.forEach((row: any, idx: number) => {
-            const colorStr = row['Color'] ? String(row['Color']).trim() : '';
-            
-            // LÓGICA DE EXPANSIÓN: Filtrar nulos y totales
-            if (colorStr !== '' && colorStr.toLowerCase() !== 'total' && colorStr.toLowerCase() !== 'sin clasificar') {
-              
-              const cantTotal = cleanNumber(row['Cant. Total']) || 1;
-              const veces = cantTotal > 0 ? cantTotal : 1;
+            // ─── FIX #2: Usar helper para descartar filas de árbol ──────────
+            if (esFilaArbol(row)) return;
 
-              // CLASIFICACIÓN DE CAPITAL POR PRIORIDAD
-              let categoria = 'OTRO';
-              if (cleanNumber(row['Demo Propios']) > 0) categoria = 'DEMO PROPIO';
-              else if (cleanNumber(row['Demo']) > 0) categoria = 'DEMO';
-              else if (cleanNumber(row['Propios']) > 0) categoria = 'PROPIO';
-              else if (cleanNumber(row['Financiado']) > 0) categoria = 'FINANCIADO';
+            const colorStr = String(row['Color']).trim();
 
-              // Dividimos los montos entre las unidades para mantener sumas perfectas
-              const mFin = cleanNumber(row['Costo Financiados']) / veces;
-              const mProp = cleanNumber(row['Costo Propios']) / veces;
-              const mDem = cleanNumber(row['Costo Demo']) / veces;
-              const mDemProp = cleanNumber(row['Costo Demo Propios']) / veces;
-              
-              const costoTotalOriginal = cleanNumber(row['Costo Total']);
-              const costoUnit = costoTotalOriginal > 0 ? (costoTotalOriginal / veces) : (mFin + mProp + mDem + mDemProp);
+            // ─── FIX #3: "Sin Clasificar" ahora SÍ se incluye ──────────────
+            // Son unidades reales sin color asignado, no filas de totales
 
-              for (let i = 0; i < veces; i++) {
-                unidadesExpandidas.push({
-                  id: `${idx}-${i}`,
-                  Sucursal: row['Sucursal'] ? String(row['Sucursal']).trim() : 'Sin Sucursal',
-                  Modelo: row['Submarca'] ? String(row['Submarca']).trim() : '',
-                  Versión: row['Versión'] ? String(row['Versión']).trim() : '',
-                  Color: colorStr,
-                  Días: cleanNumber(row['Antigüedad Promedio'] || row['Antigüedad']),
-                  Categoría: categoria,
-                  Costo: costoUnit,
-                  mFin,
-                  mProp,
-                  mDem,
-                  mDemProp
-                });
-              }
+            const cantTotal = cleanNumber(row['Cant. Total']) || 1;
+            const veces = cantTotal > 0 ? cantTotal : 1;
+
+            let categoria = 'OTRO';
+            if (cleanNumber(row['Demo Propios']) > 0)  categoria = 'DEMO PROPIO';
+            else if (cleanNumber(row['Demo']) > 0)     categoria = 'DEMO';
+            else if (cleanNumber(row['Propios']) > 0)  categoria = 'PROPIO';
+            else if (cleanNumber(row['Financiado']) > 0) categoria = 'FINANCIADO';
+
+            const mFin     = cleanNumber(row['Costo Financiados'])   / veces;
+            const mProp    = cleanNumber(row['Costo Propios'])        / veces;
+            const mDem     = cleanNumber(row['Costo Demo'])           / veces;
+            const mDemProp = cleanNumber(row['Costo Demo Propios'])   / veces;
+
+            const costoTotalOriginal = cleanNumber(row['Costo Total']);
+            const costoUnit = costoTotalOriginal > 0
+              ? costoTotalOriginal / veces
+              : mFin + mProp + mDem + mDemProp;
+
+            // ─── FIX #4: Antigüedad usa el nombre exacto del CSV ────────────
+            // La columna se llama "Antigüedad Promedio", no "Antigüedad"
+            const diasRaw = cleanNumber(row['Antigüedad Promedio']);
+
+            for (let i = 0; i < veces; i++) {
+              unidadesExpandidas.push({
+                id: `${idx}-${i}`,
+                Sucursal:  String(row['Sucursal'] ?? '').trim() || 'Sin Sucursal',
+                Modelo:    String(row['Submarca'] ?? '').trim(),
+                Versión:   String(row['Versión']  ?? '').trim(),
+                Color:     colorStr,
+                Días:      diasRaw,
+                Categoría: categoria,
+                Costo:     costoUnit,
+                mFin,
+                mProp,
+                mDem,
+                mDemProp
+              });
             }
           });
-          
+
           setData(unidadesExpandidas);
           setIsLoaded(true);
         }
       });
     }
   };
+
+  // ── El resto del componente queda idéntico a tu versión original ──────────
 
   const dashboardData = useMemo(() => {
     if (selectedAgencia === 'Todas') return data;
@@ -100,22 +128,15 @@ export default function ClinicaInventarioFinal() {
     return ['Todas', ...Array.from(set).sort()];
   }, [data]);
 
-  // STATS Y BUCKETS FINANCIEROS
   const stats = useMemo(() => {
-    let totInversion = 0;
-    let totPropio = 0;
-    let totFin = 0;
-    let totDem = 0;
-    let totDemProp = 0;
-
+    let totInversion = 0, totPropio = 0, totFin = 0, totDem = 0, totDemProp = 0;
     dashboardData.forEach(d => {
       totInversion += (d.mFin + d.mProp + d.mDem + d.mDemProp);
-      totPropio += d.mProp;
-      totFin += d.mFin;
-      totDem += d.mDem;
-      totDemProp += d.mDemProp;
+      totPropio    += d.mProp;
+      totFin       += d.mFin;
+      totDem       += d.mDem;
+      totDemProp   += d.mDemProp;
     });
-
     return {
       unidades: dashboardData.length,
       inversion: totInversion,
@@ -127,94 +148,76 @@ export default function ClinicaInventarioFinal() {
     };
   }, [dashboardData]);
 
-  // BUCKETS DE EDAD
   const agingData = useMemo(() => {
     let a0_30 = 0, a31_60 = 0, a61_90 = 0, a90plus = 0;
     dashboardData.forEach(d => {
       const e = d.Días;
-      if(e <= 30) a0_30++;
-      else if(e <= 60) a31_60++;
-      else if(e <= 90) a61_90++;
-      else a90plus++;
+      if (e <= 30)       a0_30++;
+      else if (e <= 60)  a31_60++;
+      else if (e <= 90)  a61_90++;
+      else               a90plus++;
     });
-
     return [
-      { name: '0-30 días', value: a0_30, fill: '#22c55e' },
-      { name: '31-60 días', value: a31_60, fill: '#eab308' },
-      { name: '61-90 días', value: a61_90, fill: '#f97316' },
-      { name: '+90 días', value: a90plus, fill: '#ef4444' },
+      { name: '0-30 días',  value: a0_30,   fill: '#22c55e' },
+      { name: '31-60 días', value: a31_60,  fill: '#eab308' },
+      { name: '61-90 días', value: a61_90,  fill: '#f97316' },
+      { name: '+90 días',   value: a90plus, fill: '#ef4444' },
     ];
   }, [dashboardData]);
 
-  // DATOS PARA GRÁFICA DE CAPITAL
-  const capitalData = useMemo(() => {
-    return [
-      { name: 'Financiado', value: stats.financiado, fill: '#3b82f6' },
-      { name: 'Propio', value: stats.propio, fill: '#f59e0b' },
-      { name: 'Demo', value: stats.demo, fill: '#8b5cf6' },
-      { name: 'Demo Propio', value: stats.demoPropio, fill: '#ec4899' }
-    ];
-  }, [stats]);
+  const capitalData = useMemo(() => ([
+    { name: 'Financiado',  value: stats.financiado,  fill: '#3b82f6' },
+    { name: 'Propio',      value: stats.propio,      fill: '#f59e0b' },
+    { name: 'Demo',        value: stats.demo,        fill: '#8b5cf6' },
+    { name: 'Demo Propio', value: stats.demoPropio,  fill: '#ec4899' }
+  ]), [stats]);
 
-  // MURO DE LOS LAMENTOS
   const muroLamentos = useMemo(() => {
-    const sorted = [...dashboardData].sort((a, b) => b.Días - a.Días);
-    return sorted.slice(0, 15);
+    return [...dashboardData].sort((a, b) => b.Días - a.Días).slice(0, 15);
   }, [dashboardData]);
 
-  // TABLA FILTRADA
   const tableData = useMemo(() => {
     if (!searchTerm) return dashboardData;
     const lower = searchTerm.toLowerCase();
-    return dashboardData.filter(d => 
-      (d.Modelo && d.Modelo.toLowerCase().includes(lower)) ||
-      (d.Versión && d.Versión.toLowerCase().includes(lower)) ||
-      (d.Color && d.Color.toLowerCase().includes(lower)) ||
-      (d.Sucursal && d.Sucursal.toLowerCase().includes(lower)) ||
+    return dashboardData.filter(d =>
+      (d.Modelo    && d.Modelo.toLowerCase().includes(lower))    ||
+      (d.Versión   && d.Versión.toLowerCase().includes(lower))   ||
+      (d.Color     && d.Color.toLowerCase().includes(lower))     ||
+      (d.Sucursal  && d.Sucursal.toLowerCase().includes(lower))  ||
       (d.Categoría && d.Categoría.toLowerCase().includes(lower))
     );
   }, [dashboardData, searchTerm]);
 
-  // FORMATTERS
   const formatCurrencyM = (value: number) => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(2)}M`;
-    }
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(2)}M`;
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
-  };
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
 
   const CustomTooltipBar = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const val = payload[0].value;
+      const val   = payload[0].value;
       const color = payload[0].payload.fill;
-      
-      let displayValue = `${val}`;
-      if (label.includes('días')) {
-         displayValue = `${val} uds`;
-      } else {
-         displayValue = formatCurrency(val);
-      }
-
+      const displayValue = String(label).includes('días')
+        ? `${val} uds`
+        : formatCurrency(val);
       return (
         <div className="bg-white text-slate-800 p-3 rounded-xl shadow-[0_4px_20px_rgb(0,0,0,0.08)] border border-slate-100 text-sm font-sans z-50">
-          <p className="font-bold text-slate-500 mb-1">{`${label}`}</p>
-          <p className="text-xl font-black" style={{ color }}>
-            {displayValue}
-          </p>
+          <p className="font-bold text-slate-500 mb-1">{label}</p>
+          <p className="text-xl font-black" style={{ color }}>{displayValue}</p>
         </div>
       );
     }
     return null;
   };
 
+  // ── JSX: idéntico a tu versión original ──────────────────────────────────
   return (
     <div className="min-h-full bg-slate-50 text-slate-800 p-6 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-        
+
         {/* ENCABEZADO */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60">
           <div>
@@ -224,7 +227,6 @@ export default function ClinicaInventarioFinal() {
             </h1>
             <p className="text-slate-500 text-sm font-semibold mt-1">Precisión Financiera de Unidades Reales</p>
           </div>
-          
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
             {isLoaded && agenciasUnicas.length > 1 && (
               <div className="flex flex-col w-full sm:w-auto">
@@ -237,15 +239,12 @@ export default function ClinicaInventarioFinal() {
                     onChange={(e) => setSelectedAgencia(e.target.value)}
                     className="w-full sm:w-56 appearance-none bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 transition-all cursor-pointer"
                   >
-                    {agenciasUnicas.map(ag => (
-                      <option key={ag} value={ag}>{ag}</option>
-                    ))}
+                    {agenciasUnicas.map(ag => <option key={ag} value={ag}>{ag}</option>)}
                   </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▼</div>
                 </div>
               </div>
             )}
-
             <label className="flex items-center justify-center gap-2 px-6 py-2.5 mt-5 sm:mt-0 bg-slate-900 hover:bg-slate-800 text-white rounded-xl cursor-pointer font-bold transition-all shadow-md w-full sm:w-auto text-sm">
               <Upload size={18} />
               {isLoaded ? 'Actualizar CSV' : 'Cargar Archivo'}
@@ -258,41 +257,30 @@ export default function ClinicaInventarioFinal() {
           <>
             {/* CARDS SUPERIORES */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-3 text-slate-400 mb-4">
-                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                    <Database size={24} className="stroke-[2px]" />
-                  </div>
+                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Database size={24} className="stroke-[2px]" /></div>
                   <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Unidades Totales</h3>
                 </div>
                 <p className="text-4xl font-black text-slate-900 tracking-tight">{stats.unidades}</p>
               </div>
-
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-3 text-slate-400 mb-4">
-                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                    <BadgeDollarSign size={24} className="stroke-[2px]" />
-                  </div>
+                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><BadgeDollarSign size={24} className="stroke-[2px]" /></div>
                   <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Inversión Total</h3>
                 </div>
                 <p className="text-4xl font-black text-emerald-600 tracking-tight">{formatCurrencyM(stats.inversion)}</p>
               </div>
-
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
                 <div className="absolute -right-6 -top-6 text-amber-50 opacity-50 group-hover:scale-110 transition-transform duration-500">
                   <TrendingUp size={120} className="stroke-[1px]" />
                 </div>
                 <div className="flex items-center gap-3 text-amber-600 mb-4 z-10 relative">
-                  <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
-                    <TrendingUp size={24} className="stroke-[2px]" />
-                  </div>
+                  <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100"><TrendingUp size={24} className="stroke-[2px]" /></div>
                   <h3 className="font-bold uppercase tracking-widest text-xs">Capital Propio</h3>
                 </div>
                 <p className="text-4xl font-black text-amber-600 tracking-tight z-10 relative">{formatCurrencyM(stats.capitalPropio)}</p>
-                <div className="text-[10px] text-amber-800/60 mt-2 font-black z-10 relative uppercase tracking-widest">
-                  (Propios + Demo Propios)
-                </div>
+                <div className="text-[10px] text-amber-800/60 mt-2 font-black z-10 relative uppercase tracking-widest">(Propios + Demo Propios)</div>
               </div>
             </div>
 
@@ -301,15 +289,12 @@ export default function ClinicaInventarioFinal() {
               <div className="bg-white p-6 rounded-3xl border-2 border-red-500 shadow-md relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-400"></div>
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-red-100 text-red-600 rounded-xl">
-                    <ShieldAlert size={24} className="stroke-[2px]" />
-                  </div>
+                  <div className="p-2 bg-red-100 text-red-600 rounded-xl"><ShieldAlert size={24} className="stroke-[2px]" /></div>
                   <div>
                     <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Muro de los Lamentos</h2>
                     <p className="text-sm font-semibold text-slate-500">Top 15 unidades con mayor antigüedad</p>
                   </div>
                 </div>
-                
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 text-[11px] uppercase text-slate-500 font-black border-b border-slate-200">
@@ -332,9 +317,7 @@ export default function ClinicaInventarioFinal() {
                           <td className="px-4 py-3 text-center">
                             <span className="font-black text-red-600 bg-red-100 px-2 py-1 rounded-md">{row.Días} días</span>
                           </td>
-                          <td className="px-4 py-3 text-center">
-                            {getCategoryBadge(row.Categoría)}
-                          </td>
+                          <td className="px-4 py-3 text-center">{getCategoryBadge(row.Categoría)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -345,8 +328,6 @@ export default function ClinicaInventarioFinal() {
 
             {/* GRÁFICAS */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* AGING CHART */}
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60">
                 <div className="flex items-center gap-2 mb-6">
                   <Clock className="text-slate-400" size={20} />
@@ -358,18 +339,14 @@ export default function ClinicaInventarioFinal() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                       <XAxis dataKey="name" stroke="#64748b" fontSize={11} fontFamily="inherit" fontWeight={700} tickLine={false} axisLine={false} />
                       <YAxis stroke="#64748b" fontSize={11} fontFamily="inherit" fontWeight={700} tickLine={false} axisLine={false} />
-                      <Tooltip cursor={{fill: '#f8fafc'}} content={<CustomTooltipBar />} />
+                      <Tooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltipBar />} />
                       <Bar dataKey="value" radius={[6, 6, 6, 6]}>
-                        {agingData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
+                        {agingData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
-
-              {/* CAPITAL CHART */}
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60">
                 <div className="flex items-center gap-2 mb-6">
                   <BarChart3 className="text-slate-400" size={20} />
@@ -380,26 +357,16 @@ export default function ClinicaInventarioFinal() {
                     <BarChart data={capitalData} margin={{ top: 10, right: 0, left: 10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                       <XAxis dataKey="name" stroke="#64748b" fontSize={11} fontFamily="inherit" fontWeight={700} tickLine={false} axisLine={false} />
-                      <YAxis 
-                        stroke="#64748b" 
-                        fontSize={11} 
-                        fontFamily="inherit" 
-                        fontWeight={700} 
-                        tickLine={false} 
-                        axisLine={false}
-                        tickFormatter={(val) => val >= 1000000 ? `$${(val / 1000000).toFixed(0)}M` : `$${val/1000}k`}
-                      />
-                      <Tooltip cursor={{fill: '#f8fafc'}} content={<CustomTooltipBar />} />
+                      <YAxis stroke="#64748b" fontSize={11} fontFamily="inherit" fontWeight={700} tickLine={false} axisLine={false}
+                        tickFormatter={(val) => val >= 1000000 ? `$${(val / 1000000).toFixed(0)}M` : `$${val / 1000}k`} />
+                      <Tooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltipBar />} />
                       <Bar dataKey="value" radius={[6, 6, 6, 6]}>
-                        {capitalData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
+                        {capitalData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
-
             </div>
 
             {/* TABLA DE DETALLE */}
@@ -420,7 +387,6 @@ export default function ClinicaInventarioFinal() {
                   />
                 </div>
               </div>
-
               <div className="flex-1 overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50/80 text-[11px] uppercase text-slate-500 font-black border-b border-slate-100 sticky top-0 z-10">
@@ -436,7 +402,6 @@ export default function ClinicaInventarioFinal() {
                   <tbody className="divide-y divide-slate-50">
                     {tableData.slice(0, 150).map((row, idx) => {
                       const isAlert = row.Días > 90;
-                      
                       return (
                         <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
                           <td className="px-6 py-4 text-slate-700 font-bold whitespace-nowrap">{row.Sucursal}</td>
@@ -445,9 +410,7 @@ export default function ClinicaInventarioFinal() {
                             <div className="text-xs font-medium text-slate-500 max-w-[200px] truncate" title={row.Versión}>{row.Versión || '-'}</div>
                           </td>
                           <td className="px-6 py-4 text-slate-600 font-medium">{row.Color}</td>
-                          <td className="px-6 py-4 text-center">
-                            {getCategoryBadge(row.Categoría)}
-                          </td>
+                          <td className="px-6 py-4 text-center">{getCategoryBadge(row.Categoría)}</td>
                           <td className="px-6 py-4 text-center">
                             <span className={`font-bold ${isAlert ? 'text-red-600 bg-red-50 px-2 py-1 rounded-md' : 'text-slate-700'}`}>
                               {row.Días} <span className="text-xs font-medium opacity-70">días</span>
@@ -468,10 +431,8 @@ export default function ClinicaInventarioFinal() {
                 </div>
               )}
             </div>
-
           </>
         )}
-
       </div>
     </div>
   );
