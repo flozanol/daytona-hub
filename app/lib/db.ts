@@ -26,7 +26,7 @@ export async function getInventory() {
                 TRIM(BrandDescr) as BrandDescr, 
                 TRIM(SubBrandDescr) as Modelo, 
                 TRIM(VersionDescr) as Version,
-                ModelYr as Anio,
+                ModelYr as Anio, -- Usamos 'Anio' como alias para el frontend
                 TRIM(Color) as Color,
                 UnitPrice as Precio,
                 DaysOfAntique as Antiguedad,

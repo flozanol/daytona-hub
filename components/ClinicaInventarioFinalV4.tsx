@@ -121,6 +121,8 @@ export default function ClinicaInventarioFinal() {
 
   // Multi-agencia
   const [selectedAgencias, setSelectedAgencias] = useState<string[]>([]);
+  // Filtro por Año
+  const [selectedAnios, setSelectedAnios] = useState<string[]>([]);
   // Multi-categoría Muro
   const [catsMuro, setCatsMuro] = useState<string[]>([]);
   // Multi-categoría Tabla
@@ -164,6 +166,7 @@ export default function ClinicaInventarioFinal() {
           return {
             ...row,
             id: `sql-${idx}`,
+            Anio: row.Anio, // <--- Guardamos el año modelo
             Sucursal: info ? info.nombre : `ID: ${idRaw}`,
             Sector: info ? info.sector : 'DESCONOCIDO',
             VIN: row.VIN || 'N/A',
@@ -208,10 +211,28 @@ export default function ClinicaInventarioFinal() {
     );
   };
 
+  const aniosUnicos = useMemo(() => {
+    return [...new Set(data.map(d => String(d.Anio || '')))]
+      .filter(a => a && a !== 'undefined' && a !== 'null')
+      .sort((a, b) => Number(b) - Number(a));
+  }, [data]);
+
+  const toggleAnio = (anio: string) => {
+    setSelectedAnios(prev =>
+      prev.includes(anio) ? prev.filter(a => a !== anio) : [...prev, anio]
+    );
+  };
+
   const dashboardData = useMemo(() => {
-    if (selectedAgencias.length === 0) return data;
-    return data.filter(d => selectedAgencias.includes(d.Sucursal));
-  }, [data, selectedAgencias]);
+    let current = data;
+    if (selectedAgencias.length > 0) {
+      current = current.filter(d => selectedAgencias.includes(d.Sucursal));
+    }
+    if (selectedAnios.length > 0) {
+      current = current.filter(d => selectedAnios.includes(String(d.Anio || '')));
+    }
+    return current;
+  }, [data, selectedAgencias, selectedAnios]);
 
   const stats = useMemo(() => {
     let totInversion = 0, totPropio = 0, totFin = 0, totDem = 0, totDemProp = 0;
@@ -394,14 +415,17 @@ ${rankingTexto || '  Sin datos'}
             <div className="flex items-center gap-2 mb-3">
               <Filter size={16} className="text-slate-400" />
               <span className="text-xs font-black uppercase tracking-widest text-slate-500">
-                Filtrar por Sucursal
-                {selectedAgencias.length > 0 && (
-                  <span className="ml-2 text-blue-600">({selectedAgencias.length} seleccionadas)</span>
+                Filtros Globales
+                {(selectedAgencias.length > 0 || selectedAnios.length > 0) && (
+                  <span className="ml-2 text-blue-600">({selectedAgencias.length + selectedAnios.length} activos)</span>
                 )}
               </span>
-              {selectedAgencias.length > 0 && (
+              {(selectedAgencias.length > 0 || selectedAnios.length > 0) && (
                 <button
-                  onClick={() => setSelectedAgencias([])}
+                  onClick={() => {
+                    setSelectedAgencias([]);
+                    setSelectedAnios([]);
+                  }}
                   className="ml-auto text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-widest transition-colors"
                 >
                   Limpiar
@@ -409,6 +433,30 @@ ${rankingTexto || '  Sin datos'}
               )}
             </div>
             <div className="space-y-6">
+              {aniosUnicos.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest">Año Modelo</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {aniosUnicos.map(anio => {
+                      const active = selectedAnios.includes(anio);
+                      return (
+                        <button
+                          key={anio}
+                          onClick={() => toggleAnio(anio)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                            active
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300'
+                          }`}
+                        >
+                          {anio}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h4 className="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest">Sucursales Autos</h4>
                 <div className="flex flex-wrap gap-2">
@@ -672,7 +720,16 @@ ${rankingTexto || '  Sin datos'}
                             <tr key={idx} className={`transition-colors ${aging.bg} hover:brightness-95`}>
                               <td className="px-4 py-3 font-mono text-[10px] text-slate-500">{row.VIN || '-'}</td>
                               <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">{row.Sucursal}</td>
-                              <td className="px-4 py-3 font-black text-slate-900">{row.Modelo || '-'}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-black text-slate-900">{row.Modelo || '-'}</span>
+                                  {row.Anio && (
+                                    <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded w-fit">
+                                      M.Y. {row.Anio}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                               <td className="px-4 py-3 font-bold text-right">
                                 {new Intl.NumberFormat('es-MX', { 
                                   style: 'currency', 
@@ -755,7 +812,14 @@ ${rankingTexto || '  Sin datos'}
                           <td className="px-6 py-4 font-mono text-[10px] text-slate-500 whitespace-nowrap">{row.VIN || '-'}</td>
                           <td className="px-6 py-4 text-slate-700 font-bold whitespace-nowrap">{row.Sucursal}</td>
                           <td className="px-6 py-4">
-                            <div className="font-black text-slate-900">{row.Modelo || '-'}</div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-black text-slate-900">{row.Modelo || '-'}</span>
+                              {row.Anio && (
+                                <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded w-fit">
+                                  M.Y. {row.Anio}
+                                </span>
+                              )}
+                            </div>
                             <div className="text-xs font-medium text-slate-500 max-w-[200px] truncate" title={row.Versión}>{row.Versión || '-'}</div>
                           </td>
                           <td className="px-6 py-4 text-slate-600 font-medium">{row.Color}</td>
