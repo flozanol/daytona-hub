@@ -20,21 +20,20 @@ export async function getSeminuevos() {
                 TRIM(CpnyID) as CpnyID,
                 TRIM(BrandDescr) as Marca, 
                 TRIM(SubBrandDescr) as Modelo, 
-                TRIM(VersionDescr) as Version,
                 ModelYr as Anio,
                 TRIM(Color) as Color,
-                UnitPrice as PrecioVenta,
+                UnitePrice as PrecioVenta, -- Corregido de UnitPrice a UnitePrice
                 Cost as Costo,
                 DaysOfAntique as Antiguedad,
                 VIN,
                 TRIM(FinancialStatus) as EstatusFinanciero,
                 TRIM(SiteName) as Ubicacion
             FROM InventoryUsed 
-            WHERE QtyAS > 0
+            WHERE QtyAS > 0 -- Usando tu columna confirmada QtyAS
         `);
         return result.recordset;
     } catch (err) {
-        console.error('Error SQL Seminuevos:', err);
+        console.error('Error detallado de SQL:', err);
         throw err;
     }
 }
