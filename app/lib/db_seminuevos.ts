@@ -7,8 +7,8 @@ const config = {
     database: process.env.DB_NAME,
     port: parseInt(process.env.DB_PORT || '1433'),
     options: {
-        encrypt: true,
-        trustServerCertificate: true
+        encrypt: true, 
+        trustServerCertificate: true 
     }
 };
 
@@ -20,6 +20,7 @@ export async function getSeminuevos() {
                 TRIM(CpnyID) as CpnyID,
                 TRIM(BrandDescr) as Marca, 
                 TRIM(SubBrandDescr) as Modelo, 
+                TRIM(VersionDescr) as Version,
                 ModelYr as Anio,
                 TRIM(Color) as Color,
                 UnitPrice as PrecioVenta,
@@ -27,10 +28,9 @@ export async function getSeminuevos() {
                 DaysOfAntique as Antiguedad,
                 VIN,
                 TRIM(FinancialStatus) as EstatusFinanciero,
-                TRIM(SiteName) as Ubicacion,
-                TRIM(VersionDescr) as Version
+                TRIM(SiteName) as Ubicacion
             FROM InventoryUsed 
-            WHERE Qty > 0
+            WHERE QtyAS > 0
         `);
         return result.recordset;
     } catch (err) {
