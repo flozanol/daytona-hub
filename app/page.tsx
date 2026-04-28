@@ -118,11 +118,15 @@ export default function DaytonaHub() {
           <AutosNuevosWrapper activeApp={activeApp} />
         ) : activeTab === 'seminuevos' ? (
           <div className="p-6 w-full">
-            <div className="w-full h-[calc(100vh-200px)] min-h-[700px] rounded-2xl overflow-hidden shadow-2xl border border-slate-200 bg-white">
+            <div className="flex flex-col h-[85vh] w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+              {/* Aquí cargamos tu portal COMPLETO de GitHub. 
+                 Para que la clínica sea automática, lo ideal sería que en tu código de GitHub 
+                 el link de "Clínica de Inventario" apunte a "/seminuevos-aut" 
+                 en lugar de "clinica inventario.html"
+              */}
               <iframe 
                 src="https://flozanol.github.io/daytona-seminuevos-kpis/" 
                 className="w-full h-full border-none"
-                title="Portal Seminuevos Daytona"
               />
             </div>
           </div>
