@@ -11,6 +11,3 @@ export default function ClinicaSeminuevosSQL() {
     </div>
   );
 }
-
-// Forzando la exportación del módulo como indicaste
-export { ClinicaSeminuevosSQL };
