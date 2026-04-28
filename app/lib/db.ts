@@ -29,17 +29,21 @@ export async function getInventory() {
                 ModelYr as Anio,
                 TRIM(Color) as Color,
                 UnitPrice as Precio,
-                DaysOfAntique as Antiguedad, -- Usamos el alias que espera el frontend
+                DaysOfAntique as Antiguedad,
                 VIN,
                 CostAD,
                 CostAF,
                 CostAP,
                 CostDP,
-                TRIM(SiteName) as Ubicacion,
+                -- Traemos todas las columnas de cantidad para la lógica del frontend
+                QtyAD,
                 QtyAF,
-                QtyDP
+                QtyAP,
+                QtyDP,
+                TRIM(SiteName) as Ubicacion
             FROM Inventory 
-            WHERE QtyAF > 0 OR QtyDP > 0
+            -- Ajustamos el filtro para incluir CUALQUIER auto que tenga existencia
+            WHERE QtyAF > 0 OR QtyDP > 0 OR QtyAP > 0 OR QtyAD > 0
         `);
         
         return result.recordset;

@@ -142,19 +142,24 @@ export default function ClinicaInventarioFinal() {
           const idRaw = (row.CpnyID || '').toString().trim().toUpperCase();
           const info = CPNY_MAP[idRaw];
           const ubiText = (row.Ubicacion || '').toString().toUpperCase();
+          const qtyAD = Number(row.QtyAD) || 0;
+          const qtyAF = Number(row.QtyAF) || 0;
+          const qtyAP = Number(row.QtyAP) || 0;
+          const qtyDP = Number(row.QtyDP) || 0;
 
-          // 1. DETERMINAR CATEGORÍA PRIMERO
+          // 1. DETERMINAR CATEGORÍA PRIMERO con las columnas de cantidad
           let categoria = 'FINANCIADO';
-          if (ubiText.includes('DEMO PROPIO')) categoria = 'DEMO PROPIO';
-          else if (ubiText.includes('DEMO')) categoria = 'DEMO';
-          else if (row.QtyAF === 0) categoria = 'PROPIO';
+          if (qtyDP > 0 || ubiText.includes('DEMO PROPIO')) categoria = 'DEMO PROPIO';
+          else if (qtyAD > 0 || ubiText.includes('DEMO')) categoria = 'DEMO';
+          else if (qtyAP > 0) categoria = 'PROPIO';
+          else if (qtyAF > 0) categoria = 'FINANCIADO';
 
           // 2. ASIGNAR COSTO SEGÚN LA COLUMNA DE SQL CORRECTA
           let costoFinal = 0;
-          if (categoria === 'DEMO')         costoFinal = row.CostAD || 0;
-          else if (categoria === 'FINANCIADO')   costoFinal = row.CostAF || 0;
-          else if (categoria === 'PROPIO')       costoFinal = row.CostAP || 0;
-          else if (categoria === 'DEMO PROPIO')  costoFinal = row.CostDP || 0;
+          if (categoria === 'DEMO')         costoFinal = Number(row.CostAD) || 0;
+          else if (categoria === 'FINANCIADO')   costoFinal = Number(row.CostAF) || 0;
+          else if (categoria === 'PROPIO')       costoFinal = Number(row.CostAP) || 0;
+          else if (categoria === 'DEMO PROPIO')  costoFinal = Number(row.CostDP) || 0;
 
           return {
             ...row,
