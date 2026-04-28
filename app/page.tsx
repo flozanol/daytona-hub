@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Target, ArrowRight } from 'lucide-react';
 import MinutaBoard from '../components/MinutaBoard';
 import AutosNuevosWrapper from '../components/AutosNuevosWrapper';
@@ -118,19 +118,25 @@ export default function DaytonaHub() {
         ) : activeTab === 'nuevos' ? (
           <AutosNuevosWrapper activeApp={activeApp} />
         ) : activeTab === 'seminuevos' ? (
-          <div className="space-y-8 p-6">
-            {/* 1. Mantenemos tus KPIs de Ventas y Seguimiento originales */}
-            <div className="w-full h-[600px] rounded-2xl overflow-hidden shadow-lg border border-slate-200 bg-white">
+          <div className="flex flex-col gap-8 w-full p-6">
+            {/* PORTAL ORIGINAL (Ventas y Seguimiento) */}
+            <div className="w-full h-[700px] bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
               <iframe 
                 src="https://flozanol.github.io/daytona-seminuevos-kpis/" 
                 className="w-full h-full border-none"
-                title="KPIs Seminuevos"
+                title="Portal Seminuevos"
               />
             </div>
 
-            {/* 2. Insertamos la nueva Clínica Automática conectada a SQL justo abajo */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                <ClinicaSeminuevosSQL />
+            {/* NUEVA CLÍNICA AUTOMÁTICA (Inventario SQL) */}
+            <div className="w-full bg-white rounded-2xl shadow-xl p-2 border border-slate-200">
+              <div className="p-4 border-b border-slate-100">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <span className="bg-red-500 text-white p-1.5 rounded-lg text-xs">SQL</span> 
+                  Auditoría de Inventario en Tiempo Real
+                </h2>
+              </div>
+              <ClinicaSeminuevosSQL />
             </div>
           </div>
         ) : (
