@@ -5,38 +5,31 @@ const config = {
     password: process.env.DB_PASSWORD,
     server: process.env.DB_SERVER || '',
     database: process.env.DB_NAME,
+    // Agregamos el puerto explícitamente
+    port: parseInt(process.env.DB_PORT || '1433'),
     options: {
-        encrypt: true, // Obligatorio para Azure/Nube
-        trustServerCertificate: true // Cambia a true si el servidor no tiene SSL válido
-    }
+        encrypt: true, 
+        trustServerCertificate: true 
+    },
+    // Recomendado para conexiones desde la nube
+    connectionTimeout: 30000,
+    requestTimeout: 30000
 };
 
-// export async function getInventory() {
-//    try {
-//        let pool = await sql.connect(config);
-//        // Aquí sustituye 'Inventario' por el nombre real de tu tabla o vista
-//        let result = await pool.request().query('SELECT * FROM Inventory');
-//        return result.recordset;
-//    } catch (err) {
-//        console.error('Error de conexión a SQL Server:', err);
-//        throw err;
-//    }
-// }
 export async function getInventory() {
     try {
         let pool = await sql.connect(config);
         
-        // Esta es la consulta "profesional" para tu clínica
         let result = await pool.request().query(`
             SELECT 
                 TRIM(CpnyID) as CpnyID,
-                TRIM(BrandDescr) as Marca, 
+                TRIM(BrandDescr) as BrandDescr, 
                 TRIM(SubBrandDescr) as Modelo, 
                 TRIM(VersionDescr) as Version,
                 ModelYr as Anio,
                 TRIM(Color) as Color,
                 UnitPrice as Precio,
-                DaysOfAntique as Antiguedad,
+                DaysOfAntique as Antiguedad, -- Usamos el alias que espera el frontend
                 VIN,
                 CostAD,
                 CostAF,
