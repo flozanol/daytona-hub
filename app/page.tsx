@@ -118,26 +118,11 @@ export default function DaytonaHub() {
         ) : activeTab === 'nuevos' ? (
           <AutosNuevosWrapper activeApp={activeApp} />
         ) : activeTab === 'seminuevos' ? (
-          <div className="flex flex-col gap-8 w-full p-6">
-            {/* PORTAL ORIGINAL (Ventas y Seguimiento) */}
-            <div className="w-full h-[700px] bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-              <iframe 
-                src="https://flozanol.github.io/daytona-seminuevos-kpis/" 
-                className="w-full h-full border-none"
-                title="Portal Seminuevos"
-              />
-            </div>
-
-            {/* NUEVA CLÍNICA AUTOMÁTICA (Inventario SQL) */}
-            <div className="w-full bg-white rounded-2xl shadow-xl p-2 border border-slate-200">
-              <div className="p-4 border-b border-slate-100">
-                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <span className="bg-red-500 text-white p-1.5 rounded-lg text-xs">SQL</span> 
-                  Auditoría de Inventario en Tiempo Real
-                </h2>
-              </div>
-              <ClinicaSeminuevosSQL />
-            </div>
+          <div className="w-full h-[800px] rounded-xl overflow-hidden shadow-lg border border-slate-200 p-6">
+            <iframe 
+              src="https://flozanol.github.io/daytona-seminuevos-kpis/clinica inventario.html" 
+              className="w-full h-full border-none rounded-xl"
+            />
           </div>
         ) : (
           /* MODO IFRAME (Carga el Dashboard Seleccionado) */
