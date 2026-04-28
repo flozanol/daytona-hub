@@ -1,6 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Car, Skull, FileSpreadsheet, TrendingUp, AlertTriangle, PieChart as PieChartIcon, Database, Calendar, Search } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 export default function ClinicaSeminuevosSQL() {
   return (

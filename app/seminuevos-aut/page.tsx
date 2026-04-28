@@ -1,6 +1,11 @@
-'use client'; // Agrega esto arriba para evitar errores de cliente/servidor
+'use client';
+
 import ClinicaSeminuevosSQL from '../../components/ClinicaSeminuevosSQL';
 
 export default function PaginaSoloClinica() {
-  return <ClinicaSeminuevosSQL />;
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <ClinicaSeminuevosSQL />
+    </div>
+  );
 }
