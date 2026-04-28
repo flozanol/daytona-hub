@@ -7,8 +7,8 @@ const config = {
     database: process.env.DB_NAME,
     port: parseInt(process.env.DB_PORT || '1433'),
     options: {
-        encrypt: true, 
-        trustServerCertificate: true 
+        encrypt: true,
+        trustServerCertificate: true
     }
 };
 
@@ -20,20 +20,20 @@ export async function getSeminuevos() {
                 TRIM(CpnyID) as CpnyID,
                 TRIM(BrandDescr) as Marca, 
                 TRIM(SubBrandDescr) as Modelo, 
+                TRIM(VersionDescr) as Version,
                 ModelYr as Anio,
                 TRIM(Color) as Color,
-                UnitePrice as PrecioVenta, -- Corregido de UnitPrice a UnitePrice
+                UnitePrice as PrecioVenta, -- Mantengo UnitePrice como mencionaste
                 Cost as Costo,
                 DaysOfAntique as Antiguedad,
                 VIN,
-                TRIM(FinancialStatus) as EstatusFinanciero,
-                TRIM(SiteName) as Ubicacion
+                TRIM(FinancialStatus) as EstatusFinanciero
             FROM InventoryUsed 
-            WHERE QtyAS > 0 -- Usando tu columna confirmada QtyAS
+            WHERE QtyAS > 0 -- Usando tu columna confirmada
         `);
         return result.recordset;
     } catch (err) {
-        console.error('Error detallado de SQL:', err);
+        console.error('Error SQL Seminuevos:', err);
         throw err;
     }
 }
