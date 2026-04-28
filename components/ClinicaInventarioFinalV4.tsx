@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert, Download, Mail, Trophy, Bell } from 'lucide-react';
+import { Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert, Download, Mail, Trophy, Bell, AlertTriangle, Skull, FileSpreadsheet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import * as XLSX from 'xlsx';
 
@@ -216,17 +216,29 @@ export default function ClinicaInventarioFinal() {
   const stats = useMemo(() => {
     let totInversion = 0, totPropio = 0, totFin = 0, totDem = 0, totDemProp = 0;
     dashboardData.forEach(d => {
-      totInversion += d.Costo || 0;
-      if (d.Categoría === 'PROPIO') totPropio += d.Costo || 0;
-      if (d.Categoría === 'FINANCIADO') totFin += d.Costo || 0;
-      if (d.Categoría === 'DEMO') totDem += d.Costo || 0;
-      if (d.Categoría === 'DEMO PROPIO') totDemProp += d.Costo || 0;
+      totInversion += Number(d.Costo) || 0;
+      if (d.Categoría === 'PROPIO') totPropio += Number(d.Costo) || 0;
+      if (d.Categoría === 'FINANCIADO') totFin += Number(d.Costo) || 0;
+      if (d.Categoría === 'DEMO') totDem += Number(d.Costo) || 0;
+      if (d.Categoría === 'DEMO PROPIO') totDemProp += Number(d.Costo) || 0;
     });
+
+    const montoMuro = dashboardData
+      .filter(d => d.Días > 90)
+      .reduce((acc, item) => acc + (Number(item.Costo) || 0), 0);
+
+    const unidadesMuro = dashboardData.filter(d => d.Días > 90).length;
+
     return {
-      unidades: dashboardData.length,
+      unidades: new Intl.NumberFormat('en-US').format(dashboardData.length),
       inversion: totInversion,
       capitalPropio: totPropio + totDemProp,
-      financiado: totFin, propio: totPropio, demo: totDem, demoPropio: totDemProp
+      financiado: totFin,
+      propio: totPropio,
+      demo: totDem,
+      demoPropio: totDemProp,
+      montoMuro,
+      unidadesMuro
     };
   }, [dashboardData]);
 
@@ -449,7 +461,7 @@ ${rankingTexto || '  Sin datos'}
         {data.length > 0 && (
           <>
             {/* 1. CARDS */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Database size={24} /></div>
@@ -474,6 +486,20 @@ ${rankingTexto || '  Sin datos'}
                 </div>
                 <p className="text-4xl font-black text-amber-600 tracking-tight z-10 relative">{formatCurrencyM(stats.capitalPropio)}</p>
                 <div className="text-[10px] text-amber-800/60 mt-2 font-black z-10 relative uppercase tracking-widest">(Propios + Demo Propios)</div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-red-500">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-red-50 rounded-lg text-red-600">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <span className="text-[10px] font-bold text-red-500 uppercase tracking-tighter">Más de 90 Días</span>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800">
+                  ${(stats.montoMuro / 1000000).toFixed(2)}M
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  En {stats.unidadesMuro} unidades estancadas
+                </p>
               </div>
             </div>
 
@@ -593,23 +619,25 @@ ${rankingTexto || '  Sin datos'}
             {dashboardData.some(d => d.Días > 90) && (
               <div className="bg-white p-6 rounded-3xl border-2 border-red-500 shadow-md relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-400" />
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-red-100 text-red-600 rounded-xl"><ShieldAlert size={24} /></div>
-                    <div>
-                      <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Muro de los Lamentos</h2>
-                      <p className="text-sm font-semibold text-slate-500">
-                        +90 días en inventario · {muroLamentos.length} unidades
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => exportToExcel(muroLamentos, 'muro-lamentos')}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-widest"
-                  >
-                    <Download size={14} /> Excel
-                  </button>
+                <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <Skull className="text-red-500" /> MURO DE LOS LAMENTOS
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Unidades con +90 días • Inversión estancada:
+                    <span className="font-bold text-red-600 ml-1">
+                      {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(stats.montoMuro)}
+                    </span>
+                  </p>
                 </div>
+                <button
+                  onClick={() => exportToExcel(muroLamentos, 'muro-lamentos')}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-widest"
+                >
+                  <FileSpreadsheet size={16} /> EXCEL
+                </button>
+              </div>
                 {/* Filtro multi-cat muro */}
                 <div className="mb-4 flex items-center gap-3 flex-wrap">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtrar:</span>
