@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Target, ArrowRight } from 'lucide-react';
 import MinutaBoard from '../components/MinutaBoard';
 import AutosNuevosWrapper from '../components/AutosNuevosWrapper';
-import ClinicaSeminuevosSQL from '@/components/ClinicaSeminuevosSQL';
 
 export default function DaytonaHub() {
   const [activeTab, setActiveTab] = useState('resumen');
@@ -118,11 +117,14 @@ export default function DaytonaHub() {
         ) : activeTab === 'nuevos' ? (
           <AutosNuevosWrapper activeApp={activeApp} />
         ) : activeTab === 'seminuevos' ? (
-          <div className="w-full h-[800px] rounded-xl overflow-hidden shadow-lg border border-slate-200 p-6">
-            <iframe 
-              src="https://flozanol.github.io/daytona-seminuevos-kpis/clinica inventario.html" 
-              className="w-full h-full border-none rounded-xl"
-            />
+          <div className="p-6 w-full">
+            <div className="w-full h-[calc(100vh-200px)] min-h-[700px] rounded-2xl overflow-hidden shadow-2xl border border-slate-200 bg-white">
+              <iframe 
+                src="https://flozanol.github.io/daytona-seminuevos-kpis/" 
+                className="w-full h-full border-none"
+                title="Portal Seminuevos Daytona"
+              />
+            </div>
           </div>
         ) : (
           /* MODO IFRAME (Carga el Dashboard Seleccionado) */
