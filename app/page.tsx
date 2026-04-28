@@ -118,7 +118,21 @@ export default function DaytonaHub() {
         ) : activeTab === 'nuevos' ? (
           <AutosNuevosWrapper activeApp={activeApp} />
         ) : activeTab === 'seminuevos' ? (
-          <ClinicaSeminuevosSQL />
+          <div className="space-y-8 p-6">
+            {/* 1. Mantenemos tus KPIs de Ventas y Seguimiento originales */}
+            <div className="w-full h-[600px] rounded-2xl overflow-hidden shadow-lg border border-slate-200 bg-white">
+              <iframe 
+                src="https://flozanol.github.io/daytona-seminuevos-kpis/" 
+                className="w-full h-full border-none"
+                title="KPIs Seminuevos"
+              />
+            </div>
+
+            {/* 2. Insertamos la nueva Clínica Automática conectada a SQL justo abajo */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                <ClinicaSeminuevosSQL />
+            </div>
+          </div>
         ) : (
           /* MODO IFRAME (Carga el Dashboard Seleccionado) */
           <>
