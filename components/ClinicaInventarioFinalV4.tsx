@@ -1,12 +1,36 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import Papa from 'papaparse';
-import { Upload, Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert, Download, Mail, Trophy, Bell } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert, Download, Mail, Trophy, Bell } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import * as XLSX from 'xlsx';
 
 const CATS_OPCIONES = ['FINANCIADO', 'PROPIO', 'DEMO', 'DEMO PROPIO'];
+
+const CPNY_MAP: Record<string, { nombre: string, sector: string }> = {
+  // MOTOS (Agencias de Motos)
+  'TEC': { nombre: 'Motos Tecamachalco', sector: 'MOTOS' },
+  'IZT': { nombre: 'Motos Iztapalapa', sector: 'MOTOS' },
+  'SAT': { nombre: 'Motos Satélite', sector: 'MOTOS' },
+  'ECA': { nombre: 'Motos Ecatepec', sector: 'MOTOS' },
+  'CUE': { nombre: 'Motos Cuernavaca', sector: 'MOTOS' },
+  'CUU': { nombre: 'Motos Cuautla', sector: 'MOTOS' },
+  'SATPH': { nombre: 'Motos Satélite Power House', sector: 'MOTOS' },
+  'TLN': { nombre: 'Motos Tlalnepantla', sector: 'MOTOS' },
+  'ATX': { nombre: 'Motos Atlixco', sector: 'MOTOS' },
+  // AUTOS
+  '001': { nombre: 'KIA Interlomas', sector: 'AUTOS' },
+  '002': { nombre: 'KIA Iztapalapa', sector: 'AUTOS' },
+  'MGINT': { nombre: 'MG Interlomas', sector: 'AUTOS' },
+  'MGSFE': { nombre: 'MG Santa Fe', sector: 'AUTOS' },
+  'MGIZT': { nombre: 'MG Iztapalapa', sector: 'AUTOS' },
+  'MGCUA': { nombre: 'MG Cuajimalpa', sector: 'AUTOS' },
+  'GWCUE': { nombre: 'GWM Cuernavaca', sector: 'AUTOS' },
+  'GWIZT': { nombre: 'GWM Iztapalapa', sector: 'AUTOS' },
+  'CUA': { nombre: 'Honda Cuajimalpa', sector: 'AUTOS' },
+  'INT': { nombre: 'Honda Interlomas', sector: 'AUTOS' },
+  'ACUI': { nombre: 'Acura Interlomas', sector: 'AUTOS' }
+};
 
 const getCategoryBadge = (cat: string) => {
   switch(cat) {
@@ -39,6 +63,7 @@ const exportToExcel = (rows: any[], filename: string) => {
     'Sucursal':  r.Sucursal,
     'Modelo':    r.Modelo,
     'Versión':   r.Versión,
+    'VIN':       r.VIN,
     'Color':     r.Color,
     'Categoría': r.Categoría,
     'Días':      r.Días,
@@ -107,59 +132,69 @@ export default function ClinicaInventarioFinal() {
     return isNaN(n) ? 0 : n;
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const unidades: any[] = [];
-        results.data.forEach((row: any, idx: number) => {
-          if (esFilaArbol(row)) return;
-          const colorStr = String(row['Color']).trim();
-          const cantTotal = cleanNumber(row['Cant. Total']) || 1;
-          const veces = cantTotal > 0 ? cantTotal : 1;
+  useEffect(() => {
+    const cargarDesdeSQL = async () => {
+      try {
+        const response = await fetch('/api/inventario');
+        const sqlData = await response.json();
 
-          let categoria = 'OTRO';
-          if (cleanNumber(row['Demo Propios']) > 0)    categoria = 'DEMO PROPIO';
-          else if (cleanNumber(row['Demo']) > 0)       categoria = 'DEMO';
-          else if (cleanNumber(row['Propios']) > 0)    categoria = 'PROPIO';
-          else if (cleanNumber(row['Financiado']) > 0) categoria = 'FINANCIADO';
+        const mapeado = sqlData.map((row: any, idx: number) => {
+          const idRaw = (row.CpnyID || '').toString().trim().toUpperCase();
+          const info = CPNY_MAP[idRaw];
+          const ubiText = (row.Ubicacion || '').toString().toUpperCase();
 
-          const mFin     = cleanNumber(row['Costo Financiados']) / veces;
-          const mProp    = cleanNumber(row['Costo Propios'])      / veces;
-          const mDem     = cleanNumber(row['Costo Demo'])         / veces;
-          const mDemProp = cleanNumber(row['Costo Demo Propios']) / veces;
-          const costoOrig = cleanNumber(row['Costo Total']);
-          const costoUnit = costoOrig > 0 ? costoOrig / veces : mFin + mProp + mDem + mDemProp;
-          const diasRaw = Math.round(Math.abs(cleanNumber(row['Antigüedad Promedio'])));
+          // 1. DETERMINAR CATEGORÍA PRIMERO
+          let categoria = 'FINANCIADO';
+          if (ubiText.includes('DEMO PROPIO')) categoria = 'DEMO PROPIO';
+          else if (ubiText.includes('DEMO')) categoria = 'DEMO';
+          else if (row.QtyAF === 0) categoria = 'PROPIO';
 
-          for (let i = 0; i < veces; i++) {
-            unidades.push({
-              id: `${idx}-${i}`,
-              Sucursal:  String(row['Sucursal'] ?? '').trim() || 'Sin Sucursal',
-              Modelo:    String(row['Submarca'] ?? '').trim(),
-              Versión:   String(row['Versión']  ?? '').trim(),
-              Color:     colorStr,
-              Días:      diasRaw,
-              Categoría: categoria,
-              Costo:     costoUnit,
-              mFin, mProp, mDem, mDemProp
-            });
-          }
-        });
-        setData(unidades);
-        setSelectedAgencias([]);
+          // 2. ASIGNAR COSTO SEGÚN LA COLUMNA DE SQL CORRECTA
+          let costoFinal = 0;
+          if (categoria === 'DEMO')         costoFinal = row.CostAD || 0;
+          else if (categoria === 'FINANCIADO')   costoFinal = row.CostAF || 0;
+          else if (categoria === 'PROPIO')       costoFinal = row.CostAP || 0;
+          else if (categoria === 'DEMO PROPIO')  costoFinal = row.CostDP || 0;
+
+          return {
+            ...row,
+            id: `sql-${idx}`,
+            Sucursal: info ? info.nombre : `ID: ${idRaw}`,
+            Sector: info ? info.sector : 'DESCONOCIDO',
+            VIN: row.VIN || 'N/A',
+            Categoría: categoria,
+            Costo: Number(costoFinal) || 0,
+            Versión: row.Version,
+            Días: row.Antiguedad,
+            mFin: (ubiText.includes('DEMO')) ? 0 : (row.QtyAF === 0 ? 0 : (row.Precio || 0)),
+            mProp: (ubiText.includes('DEMO')) ? 0 : (row.QtyAF === 0 ? (row.Precio || 0) : 0),
+            mDem: (ubiText.includes('DEMO') && !ubiText.includes('PROPIO')) ? (row.Precio || 0) : 0,
+            mDemProp: ubiText.includes('DEMO PROPIO') ? (row.Precio || 0) : 0
+          };
+        })
+        .filter((row: any) => row.BrandDescr !== 'OTRO');
+
+        setData(mapeado);
         setIsLoaded(true);
+      } catch (error) {
+        console.error("Error al conectar con SQL Daytona:", error);
       }
-    });
-  };
+    };
 
-  const agenciasUnicas = useMemo(() => {
-    const set = new Set<string>();
-    data.forEach(d => set.add(d.Sucursal || 'Desconocida'));
-    return Array.from(set).sort();
+    cargarDesdeSQL();
+  }, []);
+
+  // 1. Agrupamos las agencias que realmente tienen inventario
+  const agenciasEnInventario = useMemo(() => {
+    const únicas = [...new Set(data.map(d => d.Sucursal))];
+    return {
+      autos: únicas
+        .filter(nombre => Object.values(CPNY_MAP).some(v => v.nombre === nombre && v.sector === 'AUTOS'))
+        .sort((a, b) => a.localeCompare(b)),
+      motos: únicas
+        .filter(nombre => Object.values(CPNY_MAP).some(v => v.nombre === nombre && v.sector === 'MOTOS'))
+        .sort((a, b) => a.localeCompare(b))
+    };
   }, [data]);
 
   const toggleAgencia = (ag: string) => {
@@ -176,11 +211,11 @@ export default function ClinicaInventarioFinal() {
   const stats = useMemo(() => {
     let totInversion = 0, totPropio = 0, totFin = 0, totDem = 0, totDemProp = 0;
     dashboardData.forEach(d => {
-      totInversion += d.mFin + d.mProp + d.mDem + d.mDemProp;
-      totPropio    += d.mProp;
-      totFin       += d.mFin;
-      totDem       += d.mDem;
-      totDemProp   += d.mDemProp;
+      totInversion += d.Costo || 0;
+      if (d.Categoría === 'PROPIO') totPropio += d.Costo || 0;
+      if (d.Categoría === 'FINANCIADO') totFin += d.Costo || 0;
+      if (d.Categoría === 'DEMO') totDem += d.Costo || 0;
+      if (d.Categoría === 'DEMO PROPIO') totDemProp += d.Costo || 0;
     });
     return {
       unidades: dashboardData.length,
@@ -325,7 +360,7 @@ ${rankingTexto || '  Sin datos'}
             <p className="text-slate-500 text-sm font-semibold mt-1">Precisión Financiera de Unidades Reales</p>
           </div>
           <div className="flex items-center gap-3">
-            {isLoaded && (
+            {data.length > 0 && (
               <button
                 onClick={handleMailto}
                 className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black rounded-xl transition-all shadow-sm"
@@ -333,16 +368,11 @@ ${rankingTexto || '  Sin datos'}
                 <Mail size={16} /> Enviar resumen
               </button>
             )}
-            <label className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl cursor-pointer font-bold transition-all shadow-md text-sm">
-              <Upload size={18} />
-              {isLoaded ? 'Actualizar CSV' : 'Cargar Archivo'}
-              <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
-            </label>
           </div>
         </div>
 
         {/* FILTRO MULTI-AGENCIA */}
-        {isLoaded && agenciasUnicas.length > 1 && (
+        {data.length > 0 && (agenciasEnInventario.autos.length + agenciasEnInventario.motos.length) > 1 && (
           <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/60">
             <div className="flex items-center gap-2 mb-3">
               <Filter size={16} className="text-slate-400" />
@@ -361,34 +391,57 @@ ${rankingTexto || '  Sin datos'}
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              {agenciasUnicas.map(ag => {
-                const active = selectedAgencias.includes(ag);
-                const rojas = data.filter(d => d.Sucursal === ag && d.Días > 90).length;
-                return (
-                  <button
-                    key={ag}
-                    onClick={() => toggleAgencia(ag)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border transition-all ${
-                      active
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300'
-                    }`}
-                  >
-                    {ag}
-                    {rojas > 0 && (
-                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${active ? 'bg-white text-red-600' : 'bg-red-100 text-red-600'}`}>
-                        {rojas}🔴
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest">Sucursales Autos</h4>
+                <div className="flex flex-wrap gap-2">
+                  {agenciasEnInventario.autos.map(ag => {
+                    const active = selectedAgencias.includes(ag);
+                    return (
+                      <button
+                        key={ag}
+                        onClick={() => toggleAgencia(ag)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                          active
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {ag}
+                        <span className="ml-1 opacity-50">{data.filter(d => d.Sucursal === ag).length}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest">Agencias de Motos</h4>
+                <div className="flex flex-wrap gap-2">
+                  {agenciasEnInventario.motos.map(ag => {
+                    const active = selectedAgencias.includes(ag);
+                    return (
+                      <button
+                        key={ag}
+                        onClick={() => toggleAgencia(ag)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                          active
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {ag}
+                        <span className="ml-1 opacity-50">{data.filter(d => d.Sucursal === ag).length}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {isLoaded && (
+        {data.length > 0 && (
           <>
             {/* 1. CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -569,12 +622,14 @@ ${rankingTexto || '  Sin datos'}
                     <table className="w-full text-sm text-left">
                       <thead className="bg-slate-50 text-[11px] uppercase text-slate-500 font-black border-b border-slate-200">
                         <tr>
-                          <th className="px-4 py-3">Sucursal</th>
-                          <th className="px-4 py-3">Modelo</th>
-                          <th className="px-4 py-3">Versión</th>
-                          <th className="px-4 py-3">Color</th>
-                          <th className="px-4 py-3 text-center">Días</th>
-                          <th className="px-4 py-3 text-center">Categoría</th>
+                          <th className="px-4 py-3">VIN</th>
+                          <th className="px-4 py-3">SUCURSAL</th>
+                          <th className="px-4 py-3">MODELO</th>
+                          <th className="px-4 py-3">COSTO</th>
+                          <th className="px-4 py-3">VERSIÓN</th>
+                          <th className="px-4 py-3">COLOR</th>
+                          <th className="px-4 py-3 text-center">DÍAS</th>
+                          <th className="px-4 py-3 text-center">CATEGORÍA</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -582,12 +637,20 @@ ${rankingTexto || '  Sin datos'}
                           const aging = getAgingColor(row.Días);
                           return (
                             <tr key={idx} className={`transition-colors ${aging.bg} hover:brightness-95`}>
+                              <td className="px-4 py-3 font-mono text-[10px] text-slate-500">{row.VIN || '-'}</td>
                               <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">{row.Sucursal}</td>
                               <td className="px-4 py-3 font-black text-slate-900">{row.Modelo || '-'}</td>
+                              <td className="px-4 py-3 font-bold text-right">
+                                {new Intl.NumberFormat('es-MX', { 
+                                  style: 'currency', 
+                                  currency: 'MXN',
+                                  maximumFractionDigits: 0
+                                }).format(row.Costo)}
+                              </td>
                               <td className="px-4 py-3 text-xs font-medium text-slate-500 max-w-[200px] truncate" title={row.Versión}>{row.Versión || '-'}</td>
                               <td className="px-4 py-3 text-slate-600 font-medium">{row.Color}</td>
                               <td className="px-4 py-3 text-center">
-                                <span className={`font-black px-2 py-1 rounded-md border text-xs ${aging.badge}`}>{row.Días} días</span>
+                                <span className={row.Días > 90 ? 'text-red-600 font-bold' : ''}>{row.Días} días</span>
                               </td>
                               <td className="px-4 py-3 text-center">{getCategoryBadge(row.Categoría)}</td>
                             </tr>
@@ -642,12 +705,13 @@ ${rankingTexto || '  Sin datos'}
                 <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50/80 text-[11px] uppercase text-slate-500 font-black border-b border-slate-100 sticky top-0 z-10">
                     <tr>
-                      <th className="px-6 py-4">Sucursal</th>
-                      <th className="px-6 py-4">Modelo / Versión</th>
-                      <th className="px-6 py-4">Color</th>
-                      <th className="px-6 py-4 text-center">Categoría</th>
-                      <th className="px-6 py-4 text-center">Antigüedad ↓</th>
-                      <th className="px-6 py-4 text-right">Costo</th>
+                      <th className="px-6 py-4">VIN</th>
+                      <th className="px-6 py-4">SUCURSAL</th>
+                      <th className="px-6 py-4">MODELO / VERSIÓN</th>
+                      <th className="px-6 py-4">COLOR</th>
+                      <th className="px-6 py-4 text-center">CATEGORÍA</th>
+                      <th className="px-6 py-4 text-center">ANTIGÜEDAD ↓</th>
+                      <th className="px-6 py-4 text-right">COSTO</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -655,6 +719,7 @@ ${rankingTexto || '  Sin datos'}
                       const aging = getAgingColor(row.Días);
                       return (
                         <tr key={idx} className={`transition-colors ${aging.bg} hover:brightness-95`}>
+                          <td className="px-6 py-4 font-mono text-[10px] text-slate-500 whitespace-nowrap">{row.VIN || '-'}</td>
                           <td className="px-6 py-4 text-slate-700 font-bold whitespace-nowrap">{row.Sucursal}</td>
                           <td className="px-6 py-4">
                             <div className="font-black text-slate-900">{row.Modelo || '-'}</div>
