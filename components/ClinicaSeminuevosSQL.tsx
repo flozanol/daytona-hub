@@ -9,9 +9,9 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import * as XLSX from 'xlsx';
 
-// 1. Mapeo de Almacenes (Actualizado con AS25)
+// 1. Mapeo de Almacenes (Aseguramos nombres únicos y correctos)
 const CPNY_MAP: Record<string, string> = {
-  'AS25': 'Acura Interlomas', // Almacén solicitado
+  'AS25': 'Acura Interlomas',
   'ACUI': 'Acura Interlomas',
   'TEC': 'Motos Tecamachalco',
   'IZT': 'Motos Iztapalapa',
@@ -37,7 +37,7 @@ export default function ClinicaSeminuevosSQL() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAgencias, setSelectedAgencias] = useState<string[]>([]); // Multi-selección
+  const [selectedAgencias, setSelectedAgencias] = useState<string[]>([]);
 
   useEffect(() => {
     fetch('/api/seminuevos')
@@ -57,9 +57,15 @@ export default function ClinicaSeminuevosSQL() {
       });
   }, []);
 
-  // Filtros Globales
+  // Lista de agencias únicas ORDENADAS ALFABÉTICAMENTE para los botones
+  const sucursalesOrdenadas = useMemo(() => {
+    const unicas = Array.from(new Set(Object.values(CPNY_MAP)));
+    return unicas.sort((a, b) => a.localeCompare(b));
+  }, []);
+
+  // Filtros Globales y ORDENACIÓN POR ANTIGÜEDAD (Mayor a Menor)
   const filteredData = useMemo(() => {
-    let current = data;
+    let current = [...data];
     if (selectedAgencias.length > 0) current = current.filter(d => selectedAgencias.includes(d.Sucursal));
     if (searchTerm) {
         const s = searchTerm.toLowerCase();
@@ -69,7 +75,8 @@ export default function ClinicaSeminuevosSQL() {
             d.VIN?.toLowerCase().includes(s)
         );
     }
-    return current;
+    // Ordenar por Días de forma descendente
+    return current.sort((a, b) => b.Días - a.Días);
   }, [data, selectedAgencias, searchTerm]);
 
   // KPIs
@@ -85,7 +92,7 @@ export default function ClinicaSeminuevosSQL() {
     };
   }, [filteredData]);
 
-  // 2. Lógica de Marcas Tóxicas (>90 días)
+  // Marcas Tóxicas (>90 días)
   const marcasToxicas = useMemo(() => {
     const counts: Record<string, { uds: number, monto: number }> = {};
     filteredData.filter(d => d.Días > 90).forEach(d => {
@@ -99,7 +106,7 @@ export default function ClinicaSeminuevosSQL() {
       .slice(0, 5);
   }, [filteredData]);
 
-  // 3. Radiografía por Sucursal
+  // Radiografía por Sucursal
   const radiografia = useMemo(() => {
     const sucs: Record<string, any> = {};
     filteredData.forEach(d => {
@@ -128,10 +135,10 @@ export default function ClinicaSeminuevosSQL() {
     XLSX.writeFile(wb, `${filename}.xlsx`);
   };
 
-  if (loading) return <div className="p-20 text-center font-black animate-pulse">SINCRONIZANDO CON SQL...</div>;
+  if (loading) return <div className="p-20 text-center font-black animate-pulse uppercase tracking-widest text-[#003366]">Sincronizando con SQL Daytona...</div>;
 
   return (
-    <div className="min-h-full bg-slate-50 p-6 md:p-8 font-sans space-y-8">
+    <div className="min-h-full bg-slate-50 p-6 md:p-8 font-sans space-y-8 animate-in fade-in duration-500">
       
       {/* HEADER & MULTI-FILTRO */}
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
@@ -140,11 +147,11 @@ export default function ClinicaSeminuevosSQL() {
                 <Car className="text-[#fd0019]" size={32} /> Clínica de Seminuevos
             </h1>
             <div className="flex flex-wrap gap-2 justify-center">
-                {Object.values(CPNY_MAP).filter((v, i, a) => a.indexOf(v) === i).map(suc => (
+                {sucursalesOrdenadas.map(suc => (
                     <button 
                         key={suc}
                         onClick={() => setSelectedAgencias(prev => prev.includes(suc) ? prev.filter(s => s !== suc) : [...prev, suc])}
-                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all ${selectedAgencias.includes(suc) ? 'bg-slate-900 text-white border-black' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-400'}`}
+                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all ${selectedAgencias.includes(suc) ? 'bg-slate-900 text-white border-black shadow-md' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-400'}`}
                     >
                         {suc}
                     </button>
@@ -163,7 +170,6 @@ export default function ClinicaSeminuevosSQL() {
 
       {/* FILA 1: Dona, Marcas Tóxicas y Radiografía */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Dona */}
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 lg:col-span-1">
             <h2 className="text-xs font-black uppercase mb-6 border-b pb-2 tracking-widest">Semáforo Rotación</h2>
             <div className="h-48 mb-6">
@@ -178,18 +184,17 @@ export default function ClinicaSeminuevosSQL() {
             </div>
             <div className="space-y-2">
                 {donutData.map(d => (
-                    <div key={d.name} className="flex justify-between text-[10px] font-bold uppercase">
-                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full" style={{backgroundColor: d.color}}></span>{d.name}</span>
-                        <span>{d.value} ud.</span>
+                    <div key={d.name} className="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
+                        <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: d.color}}></span>{d.name}</span>
+                        <span className="text-slate-900">{d.value} ud.</span>
                     </div>
                 ))}
             </div>
         </div>
 
-        {/* Top Marcas Tóxicas */}
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 lg:col-span-1">
             <h2 className="text-xs font-black uppercase mb-2 border-b pb-2 text-[#fd0019]">Top Marcas Tóxicas</h2>
-            <p className="text-[9px] text-gray-400 font-bold uppercase mb-4 tracking-tighter">Dinero congelado (+90 días)</p>
+            <p className="text-[9px] text-gray-400 font-bold uppercase mb-4 tracking-tighter">Congelado (+90 días)</p>
             <div className="space-y-4">
                 {marcasToxicas.map(m => (
                     <div key={m.name}>
@@ -198,14 +203,13 @@ export default function ClinicaSeminuevosSQL() {
                             <span className="text-[#fd0019]">{fmtMoney(m.monto)}</span>
                         </div>
                         <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-[#fd0019] h-full" style={{ width: `${(m.monto / marcasToxicas[0].monto) * 100}%` }} />
+                            <div className="bg-[#fd0019] h-full" style={{ width: `${(m.monto / (marcasToxicas[0]?.monto || 1)) * 100}%` }} />
                         </div>
                     </div>
                 ))}
             </div>
         </div>
 
-        {/* Radiografía por Sucursal */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 lg:col-span-2 overflow-hidden flex flex-col">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center">
                 <h2 className="text-xs font-black uppercase tracking-widest">Radiografía por Sucursal</h2>
@@ -216,20 +220,20 @@ export default function ClinicaSeminuevosSQL() {
                     <thead className="bg-slate-900 text-white sticky top-0 font-black uppercase">
                         <tr>
                             <th className="p-3">Sucursal</th>
-                            <th className="p-3 text-center">Unidades</th>
+                            <th className="p-3 text-center">Total</th>
                             <th className="p-3 text-center text-green-400">Sano</th>
                             <th className="p-3 text-center text-red-500">Hueso</th>
-                            <th className="p-3 text-right">Cost. Congelado</th>
+                            <th className="p-3 text-right">Monto Hueso</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {radiografia.map(ag => (
-                            <tr key={ag.name} className="hover:bg-slate-50 font-bold">
-                                <td className="p-3 text-slate-900">{ag.name}</td>
+                            <tr key={ag.name} className="hover:bg-slate-50 font-bold transition-colors">
+                                <td className="p-3 text-slate-900 truncate max-w-[120px]">{ag.name}</td>
                                 <td className="p-3 text-center text-slate-500">{ag.total}</td>
                                 <td className="p-3 text-center text-green-600">{ag.sano}</td>
                                 <td className="p-3 text-center text-red-600">{ag.hueso}</td>
-                                <td className="p-3 text-right text-[#fd0019]">{fmtMoney(ag.montoHueso)}</td>
+                                <td className="p-3 text-right text-[#fd0019] bg-red-50/30">{fmtMoney(ag.montoHueso)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -238,15 +242,15 @@ export default function ClinicaSeminuevosSQL() {
         </div>
       </div>
 
-      {/* FILA 2: Muro de los Lamentos */}
+      {/* MURO DE LOS LAMENTOS */}
       <div className="bg-white rounded-3xl shadow-md border-2 border-red-500 overflow-hidden">
-        <div className="bg-slate-900 p-4 flex justify-between items-center">
+        <div className="bg-black p-4 flex justify-between items-center">
             <h2 className="text-white font-black text-sm uppercase flex items-center gap-2">
-                <Skull className="text-red-500" size={18}/> Muro de los Lamentos (Huesos)
+                <Skull className="text-red-500" size={18}/> Muro de los Lamentos (Riesgo Crítico)
             </h2>
             <button 
-                onClick={() => exportToExcel(filteredData.filter(d => d.Días > 90), 'Huesos_Seminuevos')}
-                className="bg-[#fd0019] text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-2"
+                onClick={() => exportToExcel(filteredData.filter(d => d.Días > 90), 'Muro_Lamentos_Seminuevos')}
+                className="bg-[#fd0019] text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-2 hover:bg-red-700 transition-colors"
             >
                 <FileSpreadsheet size={14}/> Descargar Huesos
             </button>
@@ -263,10 +267,10 @@ export default function ClinicaSeminuevosSQL() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                    {filteredData.filter(d => d.Días > 90).sort((a,b) => b.Días - a.Días).map((auto, i) => (
+                    {filteredData.filter(d => d.Días > 90).map((auto, i) => (
                         <tr key={i} className="hover:bg-red-50 transition-colors font-bold">
-                            <td className="p-3 text-center"><span className="bg-red-600 text-white px-2 py-1 rounded-md">{auto.Días}</span></td>
-                            <td className="p-3">{auto.Anio} {auto.Marca} {auto.Modelo}</td>
+                            <td className="p-3 text-center"><span className="bg-red-600 text-white px-2 py-1 rounded-md font-black text-[11px]">{auto.Días}</span></td>
+                            <td className="p-3 text-slate-900">{auto.Anio} {auto.Marca} {auto.Modelo}</td>
                             <td className="p-3 font-mono text-[10px] text-slate-400">{auto.VIN}</td>
                             <td className="p-3 uppercase text-slate-500">{auto.Sucursal}</td>
                             <td className="p-3 text-right text-red-600">{fmtMoney(auto.Costo)}</td>
@@ -277,7 +281,7 @@ export default function ClinicaSeminuevosSQL() {
         </div>
       </div>
 
-      {/* FILA 3: Inventario Completo */}
+      {/* INVENTARIO COMPLETO (ORDENADO POR ANTIGÜEDAD) */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
             <h2 className="text-slate-900 font-black text-lg flex items-center gap-2">
@@ -287,14 +291,14 @@ export default function ClinicaSeminuevosSQL() {
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                     <input 
-                        type="text" placeholder="Buscar..." 
+                        type="text" placeholder="Buscar modelo, marca, VIN..." 
                         value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                        className="bg-slate-50 w-full pl-10 pr-4 py-2 rounded-xl text-xs font-bold outline-none border border-slate-200 focus:border-blue-500"
+                        className="bg-slate-50 w-full pl-10 pr-4 py-2 rounded-xl text-xs font-bold outline-none border border-slate-200 focus:border-blue-500 shadow-inner"
                     />
                 </div>
                 <button 
                     onClick={() => exportToExcel(filteredData, 'Inventario_Seminuevos_Completo')}
-                    className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-2"
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-500/20"
                 >
                     <Download size={16}/> Exportar
                 </button>
@@ -302,27 +306,27 @@ export default function ClinicaSeminuevosSQL() {
         </div>
         <div className="overflow-auto max-h-[500px] scrollbar-thin">
             <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 sticky top-0 font-black uppercase text-[10px] text-slate-500 border-b">
+                <thead className="bg-slate-100 sticky top-0 font-black uppercase text-[10px] text-slate-500 border-b z-10 shadow-sm">
                     <tr>
                         <th className="p-3">Sucursal</th>
                         <th className="p-3">Vehículo</th>
                         <th className="p-3">Versión</th>
                         <th className="p-3">Color</th>
-                        <th className="p-3 text-center">Antigüedad</th>
-                        <th className="p-3 text-center">Estatus</th>
+                        <th className="p-3 text-center bg-blue-50 text-blue-800">Días ↓</th>
+                        <th className="p-3 text-center">Financiero</th>
                         <th className="p-3 text-right">Precio Venta</th>
                         <th className="p-3 text-right">Costo</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {filteredData.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 font-medium">
+                        <tr key={idx} className={`hover:bg-slate-50 font-medium transition-colors ${row.Días > 90 ? 'bg-red-50/30' : ''}`}>
                             <td className="p-3 font-bold text-slate-600">{row.Sucursal}</td>
                             <td className="p-3 font-black text-slate-900">{row.Anio} {row.Marca} {row.Modelo}</td>
-                            <td className="p-3 text-slate-500">{row.Version}</td>
+                            <td className="p-3 text-slate-500 truncate max-w-[150px]">{row.Version}</td>
                             <td className="p-3 text-slate-500">{row.Color}</td>
-                            <td className="p-3 text-center font-black">
-                                <span className={`${row.Días > 90 ? 'text-red-600' : 'text-slate-900'}`}>{row.Días} días</span>
+                            <td className="p-3 text-center font-black bg-blue-50/50">
+                                <span className={`${row.Días > 90 ? 'text-red-600' : 'text-slate-900'}`}>{row.Días}</span>
                             </td>
                             <td className="p-3 text-center">
                                 <span className={`px-2 py-1 rounded text-[9px] font-black uppercase ${row.EstatusFinanciero === 'PROPIO' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
