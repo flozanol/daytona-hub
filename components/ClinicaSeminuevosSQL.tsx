@@ -209,7 +209,7 @@ export default function ClinicaSeminuevosSQL() {
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 lg:col-span-2 overflow-hidden flex flex-col">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center">
                 <h2 className="text-xs font-black uppercase tracking-widest">Radiografía por Sucursal</h2>
-                <span className="text-[9px] font-black text-slate-400 uppercase">Inventario >90 Días</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase">Inventario &gt;90 Días</span>
             </div>
             <div className="overflow-auto flex-1 scrollbar-thin">
                 <table className="w-full text-left text-[10px]">
