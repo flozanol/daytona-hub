@@ -7,8 +7,8 @@ const config = {
     database: process.env.DB_NAME,
     port: parseInt(process.env.DB_PORT || '1433'),
     options: {
-        encrypt: true,
-        trustServerCertificate: true
+        encrypt: true, 
+        trustServerCertificate: true 
     }
 };
 
@@ -17,19 +17,19 @@ export async function getSeminuevos() {
         let pool = await sql.connect(config);
         let result = await pool.request().query(`
             SELECT 
-                TRIM(CpnyID) as CpnyID,
+                TRIM(CpnyId) as CpnyID,
                 TRIM(BrandDescr) as Marca, 
                 TRIM(SubBrandDescr) as Modelo, 
                 TRIM(VersionDescr) as Version,
                 ModelYr as Anio,
                 TRIM(Color) as Color,
-                UnitePrice as PrecioVenta, -- Mantengo UnitePrice como mencionaste
+                UnitPrice as PrecioVenta, 
                 Cost as Costo,
                 DaysOfAntique as Antiguedad,
                 VIN,
                 TRIM(FinancialStatus) as EstatusFinanciero
             FROM InventoryUsed 
-            WHERE QtyAS > 0 -- Usando tu columna confirmada
+            WHERE QtyAS > 0 -- Usando tu columna confirmada de cantidad
         `);
         return result.recordset;
     } catch (err) {
