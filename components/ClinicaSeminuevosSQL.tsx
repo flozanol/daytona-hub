@@ -59,6 +59,7 @@ export default function ClinicaSeminuevosSQL() {
               Costo: costo,
               Días: dias,
               CostoFinanciero: costoFinancieroAcumulado,
+              InversionTotal: costo + costoFinancieroAcumulado, // El nuevo dato "bolsa completa"
               Margen: (Number(row.PrecioVenta) || 0) - costo
             };
           });
@@ -84,7 +85,7 @@ export default function ClinicaSeminuevosSQL() {
         d.VIN?.toLowerCase().includes(s)
       );
     }
-    return current.sort((a, b) => b.Días - a.Días); // Ordenado por antigüedad mayor a menor
+    return current.sort((a, b) => b.Días - a.Días);
   }, [data, selectedAgencias, searchTerm]);
 
   const stats = useMemo(() => {
@@ -102,7 +103,7 @@ export default function ClinicaSeminuevosSQL() {
     };
   }, [filteredData]);
 
-  // --- LÓGICA DE GRÁFICAS RESTAURADA ---
+  // Gráficas
   const donutData = useMemo(() => [
     { name: 'Sano (0-30)', value: filteredData.filter(d => d.Días <= 30).length, color: '#10b981' },
     { name: 'Precaución (31-60)', value: filteredData.filter(d => d.Días > 30 && d.Días <= 60).length, color: '#f59e0b' },
@@ -175,19 +176,18 @@ export default function ClinicaSeminuevosSQL() {
           </div>
         </div>
 
-        {/* KPIs SUPERIORES (5 Tarjetas) */}
+        {/* KPIs SUPERIORES */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <KPICard title="Unidades" value={stats.unidades} icon={<Car />} color="text-slate-800" />
-          <KPICard title="Inversión Total" value={fmtMoney(stats.costo)} icon={<Database />} color="text-[#003366]" />
+          <KPICard title="Inversión Unidades" value={fmtMoney(stats.costo)} icon={<Database />} color="text-[#003366]" />
           <KPICard title="Capital en Riesgo" value={fmtMoney(stats.riesgo)} icon={<AlertTriangle />} color="text-[#fd0019]" subtitle="+90 Días" />
-          <KPICard title="Costo Financiero" value={fmtMoney(stats.financiero)} icon={<Coins />} color="text-amber-600" subtitle={`Tasa: ${(TASA_ANUAL * 100).toFixed(2)}%`} />
+          <KPICard title="Costo Fin. Total" value={fmtMoney(stats.financiero)} icon={<Coins />} color="text-amber-600" subtitle={`Tasa: ${(TASA_ANUAL * 100).toFixed(2)}%`} />
           <KPICard title="Promedio Días" value={`${stats.diasPromedio} d`} icon={<Calendar />} color="text-slate-800" />
         </div>
       </div>
 
-      {/* FILA 1: DONA, MARCAS TÓXICAS Y RADIOGRAFÍA (Restaurado) */}
+      {/* FILA 1: GRÁFICAS */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Dona Semáforo */}
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 lg:col-span-1">
           <h2 className="text-xs font-black uppercase mb-6 border-b pb-2 tracking-widest">Semáforo Rotación</h2>
           <div className="h-48 mb-6">
@@ -210,7 +210,6 @@ export default function ClinicaSeminuevosSQL() {
           </div>
         </div>
 
-        {/* Top Marcas Tóxicas */}
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 lg:col-span-1">
           <h2 className="text-xs font-black uppercase mb-2 border-b pb-2 text-[#fd0019]">Top Marcas Tóxicas</h2>
           <p className="text-[9px] text-gray-400 font-bold uppercase mb-4 tracking-tighter">Congelado (+90 días)</p>
@@ -229,7 +228,6 @@ export default function ClinicaSeminuevosSQL() {
           </div>
         </div>
 
-        {/* Radiografía por Sucursal */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 lg:col-span-2 overflow-hidden flex flex-col">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center">
             <h2 className="text-xs font-black uppercase tracking-widest">Radiografía por Sucursal</h2>
@@ -278,17 +276,21 @@ export default function ClinicaSeminuevosSQL() {
               <tr>
                 <th className="p-3 text-center">Días</th>
                 <th className="p-3">Vehículo</th>
+                <th className="p-3">Sucursal</th>
                 <th className="p-3 text-right">Costo Auto</th>
-                <th className="p-3 text-right bg-red-50 text-red-700">Costo Financiero</th>
+                <th className="p-3 text-right">Costo Financiero</th>
+                <th className="p-3 text-right bg-red-50 text-red-700 font-black">Inversión Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredData.filter(d => d.Días > 90).map((auto, i) => (
-                <tr key={i} className="hover:bg-red-50 transition-colors font-bold">
+                <tr key={i} className="hover:bg-red-50 transition-colors font-bold text-[11px]">
                   <td className="p-3 text-center"><span className="bg-red-600 text-white px-2 py-1 rounded-md">{auto.Días}</span></td>
                   <td className="p-3 text-slate-900">{auto.Anio} {auto.Marca} {auto.Modelo}</td>
-                  <td className="p-3 text-right">{fmtMoney(auto.Costo)}</td>
-                  <td className="p-3 text-right text-red-600 font-black">{fmtMoney(auto.CostoFinanciero)}</td>
+                  <td className="p-3 uppercase text-slate-500">{auto.Sucursal}</td>
+                  <td className="p-3 text-right text-slate-400">{fmtMoney(auto.Costo)}</td>
+                  <td className="p-3 text-right text-amber-600">{fmtMoney(auto.CostoFinanciero)}</td>
+                  <td className="p-3 text-right text-red-600 font-black">{fmtMoney(auto.InversionTotal)}</td>
                 </tr>
               ))}
             </tbody>
@@ -296,15 +298,15 @@ export default function ClinicaSeminuevosSQL() {
         </div>
       </div>
 
-      {/* INVENTARIO COMPLETO (Saneado y Ordenado) */}
+      {/* INVENTARIO COMPLETO */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
           <h2 className="text-slate-900 font-black text-lg">Inventario Total</h2>
           <div className="flex gap-3 w-full md:w-auto">
             <input
-              type="text" placeholder="Buscar..."
+              type="text" placeholder="Buscar modelo, VIN..."
               value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-              className="bg-slate-50 pl-4 pr-4 py-2 rounded-xl text-xs font-bold outline-none border border-slate-200 shadow-inner"
+              className="bg-slate-50 pl-4 pr-4 py-2 rounded-xl text-xs font-bold outline-none border border-slate-200"
             />
             <button onClick={() => exportToExcel(filteredData, 'Inventario_Completo')} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow-md">
               Exportar Todo
@@ -317,9 +319,9 @@ export default function ClinicaSeminuevosSQL() {
               <tr>
                 <th className="p-3">Sucursal</th>
                 <th className="p-3">Vehículo</th>
+                <th className="p-3">VIN</th>
                 <th className="p-3 text-center">Días</th>
-                <th className="p-3 text-right">Costo</th>
-                <th className="p-3 text-right text-amber-600">Costo Fin.</th>
+                <th className="p-3 text-right">Inversión Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -327,13 +329,13 @@ export default function ClinicaSeminuevosSQL() {
                 <tr key={idx} className="hover:bg-slate-50 font-medium">
                   <td className="p-3 font-bold text-slate-600">{row.Sucursal}</td>
                   <td className="p-3 font-black text-slate-900">{row.Anio} {row.Marca} {row.Modelo}</td>
+                  <td className="p-3 font-mono text-[9px] text-slate-400">{row.VIN}</td>
                   <td className="p-3 text-center">
                     <span className={`px-3 py-1 rounded-full border font-black text-[10px] ${getAgeColor(row.Días)}`}>
                       {row.Días} días
                     </span>
                   </td>
-                  <td className="p-3 text-right font-bold">{fmtMoney(row.Costo)}</td>
-                  <td className="p-3 text-right font-black text-amber-600">{fmtMoney(row.CostoFinanciero)}</td>
+                  <td className="p-3 text-right font-black text-slate-900">{fmtMoney(row.InversionTotal)}</td>
                 </tr>
               ))}
             </tbody>
