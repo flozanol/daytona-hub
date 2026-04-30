@@ -59,7 +59,7 @@ export default function ClinicaSeminuevosSQL() {
               Costo: costo,
               Días: dias,
               CostoFinanciero: costoFinancieroAcumulado,
-              InversionTotal: costo + costoFinancieroAcumulado, // El nuevo dato "bolsa completa"
+              InversionTotal: costo + costoFinancieroAcumulado,
               Margen: (Number(row.PrecioVenta) || 0) - costo
             };
           });
@@ -103,7 +103,6 @@ export default function ClinicaSeminuevosSQL() {
     };
   }, [filteredData]);
 
-  // Gráficas
   const donutData = useMemo(() => [
     { name: 'Sano (0-30)', value: filteredData.filter(d => d.Días <= 30).length, color: '#10b981' },
     { name: 'Precaución (31-60)', value: filteredData.filter(d => d.Días > 30 && d.Días <= 60).length, color: '#f59e0b' },
@@ -298,7 +297,7 @@ export default function ClinicaSeminuevosSQL() {
         </div>
       </div>
 
-      {/* INVENTARIO COMPLETO */}
+      {/* INVENTARIO COMPLETO (Actualizado con Desglose Financiero) */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
           <h2 className="text-slate-900 font-black text-lg">Inventario Total</h2>
@@ -306,7 +305,7 @@ export default function ClinicaSeminuevosSQL() {
             <input
               type="text" placeholder="Buscar modelo, VIN..."
               value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-              className="bg-slate-50 pl-4 pr-4 py-2 rounded-xl text-xs font-bold outline-none border border-slate-200"
+              className="bg-slate-50 pl-4 pr-4 py-2 rounded-xl text-xs font-bold outline-none border border-slate-200 shadow-inner"
             />
             <button onClick={() => exportToExcel(filteredData, 'Inventario_Completo')} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow-md">
               Exportar Todo
@@ -321,12 +320,14 @@ export default function ClinicaSeminuevosSQL() {
                 <th className="p-3">Vehículo</th>
                 <th className="p-3">VIN</th>
                 <th className="p-3 text-center">Días</th>
-                <th className="p-3 text-right">Inversión Total</th>
+                <th className="p-3 text-right">Costo</th>
+                <th className="p-3 text-right text-amber-600">Costo Fin.</th>
+                <th className="p-3 text-right font-black">Inversión Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredData.map((row, idx) => (
-                <tr key={idx} className="hover:bg-slate-50 font-medium">
+                <tr key={idx} className="hover:bg-slate-50 font-medium transition-colors">
                   <td className="p-3 font-bold text-slate-600">{row.Sucursal}</td>
                   <td className="p-3 font-black text-slate-900">{row.Anio} {row.Marca} {row.Modelo}</td>
                   <td className="p-3 font-mono text-[9px] text-slate-400">{row.VIN}</td>
@@ -335,7 +336,9 @@ export default function ClinicaSeminuevosSQL() {
                       {row.Días} días
                     </span>
                   </td>
-                  <td className="p-3 text-right font-black text-slate-900">{fmtMoney(row.InversionTotal)}</td>
+                  <td className="p-3 text-right text-slate-500">{fmtMoney(row.Costo)}</td>
+                  <td className="p-3 text-right text-amber-600">{fmtMoney(row.CostoFinanciero)}</td>
+                  <td className="p-3 text-right font-black text-slate-900 bg-slate-50/50">{fmtMoney(row.InversionTotal)}</td>
                 </tr>
               ))}
             </tbody>
