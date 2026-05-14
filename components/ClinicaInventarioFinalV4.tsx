@@ -137,7 +137,7 @@ export default function ClinicaInventarioFinal() {
   useEffect(() => {
     const cargarDesdeSQL = async () => {
       try {
-        const response = await fetch('/api/inventario');
+        const response = await fetch('/api/inventario', { cache: 'no-store' });
         const sqlData = await response.json();
 
         const mapeado = sqlData.map((row: any, idx: number) => {
