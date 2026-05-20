@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert, Download, Mail, Trophy, Bell, AlertTriangle, Skull, FileSpreadsheet } from 'lucide-react';
+import { Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, AlertTriangle, Download, Mail, Trophy, Bell, Skull, FileSpreadsheet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import * as XLSX from 'xlsx';
 
@@ -28,7 +28,7 @@ const CPNY_MAP: Record<string, { nombre: string, sector: string }> = {
   '002': { nombre: 'KIA Iztapalapa', sector: 'AUTOS' },
   'MGINT': { nombre: 'MG Interlomas', sector: 'AUTOS' },
   'MGSFE': { nombre: 'MG Santa Fe', sector: 'AUTOS' },
-  'MGIZT': { nombre: 'MG Iztapalapa', sector: 'AUTOS' },
+  'MGINT': { nombre: 'MG Iztapalapa', sector: 'AUTOS' },
   'MGCUA': { nombre: 'MG Cuajimalpa', sector: 'AUTOS' },
   'GWCUE': { nombre: 'GWM Cuernavaca', sector: 'AUTOS' },
   'GWIZT': { nombre: 'GWM Iztapalapa', sector: 'AUTOS' },
@@ -54,9 +54,11 @@ const getAgingColor = (dias: number): { bg: string; badge: string } => {
   return          { bg: 'bg-red-50',    badge: 'bg-red-100 text-red-800 border-red-200' };
 };
 
+// --- CORRECCIÓN AQUÍ: SE AGREGA EL AÑO MODELO AL EXCEL ---
 const exportToExcel = (rows: any[], filename: string) => {
   const exportData = rows.map(r => ({
     'Sucursal':  r.Sucursal,
+    'Año Modelo': r.Anio || 'N/A', // 👈 Nueva columna en la exportación
     'Modelo':    r.Modelo,
     'Versión':   r.Versión,
     'VIN':       r.VIN,
