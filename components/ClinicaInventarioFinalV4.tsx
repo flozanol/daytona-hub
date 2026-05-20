@@ -28,7 +28,7 @@ const CPNY_MAP: Record<string, { nombre: string, sector: string }> = {
   '002': { nombre: 'KIA Iztapalapa', sector: 'AUTOS' },
   'MGINT': { nombre: 'MG Interlomas', sector: 'AUTOS' },
   'MGSFE': { nombre: 'MG Santa Fe', sector: 'AUTOS' },
-  'MGINT': { nombre: 'MG Iztapalapa', sector: 'AUTOS' },
+  'MGIZT': { nombre: 'MG Iztapalapa', sector: 'AUTOS' },
   'MGCUA': { nombre: 'MG Cuajimalpa', sector: 'AUTOS' },
   'GWCUE': { nombre: 'GWM Cuernavaca', sector: 'AUTOS' },
   'GWIZT': { nombre: 'GWM Iztapalapa', sector: 'AUTOS' },
