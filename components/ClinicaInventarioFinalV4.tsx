@@ -151,7 +151,6 @@ export default function ClinicaInventarioFinal() {
           const costo = Number(costoFinal) || 0;
           const dias = Number(row.Antiguedad) || 0;
           
-          // Cálculo financiero exacto acumulado por días de piso
           const costoFinancieroAcumulado = (costo * TASA_ANUAL / 360) * dias;
 
           return {
@@ -345,9 +344,6 @@ export default function ClinicaInventarioFinal() {
     const alertasTexto = alertasSucursal
       .map(a => `  • ${a.sucursal}: ${a.rojas} unidades en rojo`)
       .join('\n');
-    const rankingTexto = rankingModelos
-      .map((r, i) => `  ${i + 1}. ${r.modelo}: ${r.uds} unidades`)
-      .join('\n');
     const body = encodeURIComponent(
 `Clínica de Inventario — ${fecha}
 Sucursales: ${agSel}
@@ -521,7 +517,6 @@ ${alertasTexto || '  Sin alertas'}
                 <p className="text-3xl font-black text-emerald-600 tracking-tight">{formatCurrencyM(stats.inversion)}</p>
               </div>
 
-              {/* NUEVA TARJETA: COSTO FINANCIERO TOTAL */}
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-3 bg-purple-50 text-purple-600 rounded-xl"><Clock size={24} /></div>
@@ -543,15 +538,32 @@ ${alertasTexto || '  Sin alertas'}
                 <div className="text-[10px] text-amber-800/60 mt-2 font-black z-10 relative uppercase tracking-widest">(Propios + Demo Propios)</div>
               </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-red-500 flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="p-2 bg-red-50 rounded-lg text-red-600"><AlertTriangle size={20} /></div>
-                  <span className="text-[10px] font-bold text-red-500 uppercase tracking-tighter">Más de 90 Días</span>
+              {/* TARJETA REDISEÑADA Y REESTRUCTURADA: MÁS DE 90 DÍAS */}
+              <div className="bg-red-50 p-6 rounded-3xl shadow-sm border border-red-100 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
+                <div className="absolute right-[-10%] top-[-10%] w-32 h-32 bg-red-500/5 rounded-full group-hover:scale-110 transition-transform duration-500 -z-0" />
+                
+                <div className="flex items-center justify-between mb-4 z-10 relative">
+                  <div className="flex items-center gap-3 text-red-700">
+                    <div className="p-2.5 bg-red-500 text-white rounded-[14px] shadow-md shadow-red-500/20">
+                      <AlertTriangle size={20} />
+                    </div>
+                    <h3 className="font-black uppercase tracking-wider text-[11px]">Más de 90 Días</h3>
+                  </div>
+                  <span className="text-[10px] font-black px-2 py-0.5 bg-red-600 text-white rounded-md uppercase tracking-tighter shadow-sm animate-pulse">
+                    Crítico 🔴
+                  </span>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-800">{formatCurrencyM(stats.montoMuro)} <span className="text-xs text-slate-400 font-normal">Base</span></h3>
-                  <p className="text-xs font-black text-purple-600 mt-0.5">+ {formatCurrencyM(stats.montoMuroFinanciero)} Fin.</p>
-                  <p className="text-[11px] text-slate-500 mt-1">En {stats.unidadesMuro} unidades</p>
+
+                <div className="z-10 relative">
+                  <p className="text-3xl font-black text-red-600 tracking-tight">
+                    {formatCurrencyM(stats.montoMuro)}
+                  </p>
+                  <p className="text-xs font-bold text-purple-600 mt-1">
+                    + {formatCurrencyM(stats.montoMuroFinanciero)} Costo Fin.
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1.5 font-bold uppercase tracking-widest">
+                    Afectando a {stats.unidadesMuro} unidades
+                  </p>
                 </div>
               </div>
             </div>
@@ -588,7 +600,7 @@ ${alertasTexto || '  Sin alertas'}
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                       <XAxis dataKey="name" stroke="#64748b" fontSize={11} fontWeight={700} tickLine={false} axisLine={false} />
                       <YAxis stroke="#64748b" fontSize={11} fontWeight={700} tickLine={false} axisLine={false}
-                        tickFormatter={v => v >= 1000000 ? `$${(v/1000000).toFixed(0)}M` : `$${v/1000}k`} />
+                        tickFormatter={v => v >= 1000000 ? `$${(v/1000000).toFixed(0)}M` : `$${v/100}k`} />
                       <Tooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltipBar />} />
                       <Bar dataKey="value" radius={[6,6,6,6]}>
                         {capitalData.map((e, i) => <Cell key={i} fill={e.fill} />)}
@@ -652,7 +664,7 @@ ${alertasTexto || '  Sin alertas'}
               </div>
             )}
 
-            {/* 4. MURO DE LOS LAMENTOS CON DESGLOSE FINANCIERO */}
+            {/* 4. MURO DE LOS LAMENTOS */}
             {dashboardData.some(d => d.Días > 90) && (
               <div className="bg-white p-6 rounded-3xl border-2 border-red-500 shadow-md relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-400" />
@@ -713,7 +725,7 @@ ${alertasTexto || '  Sin alertas'}
               </div>
             )}
 
-            {/* 5. INVENTARIO EXPANDIDO CON DESGLOSE TOTAL */}
+            {/* 5. INVENTARIO EXPANDIDO */}
             <div className="bg-white overflow-hidden rounded-3xl shadow-sm border border-slate-200/60 flex flex-col min-h-[500px]">
               <div className="p-6 border-b border-slate-100 space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
