@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert, Download, Mail, Trophy, Bell, AlertTriangle, Skull, FileSpreadsheet } from 'lucide-react';
+import { Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, AlertTriangle, Download, Mail, Trophy, Bell, Skull, FileSpreadsheet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import * as XLSX from 'xlsx';
 
@@ -538,7 +538,7 @@ ${alertasTexto || '  Sin alertas'}
                 <div className="text-[10px] text-amber-800/60 mt-2 font-black z-10 relative uppercase tracking-widest">(Propios + Demo Propios)</div>
               </div>
 
-              {/* TARJETA DINÁMICA: MÁS DE 90 DÍAS (CON SUMA TOTAL, CAPITAL E INTERESES REACTIVOS) */}
+              {/* TARJETA DINÁMICA REMODELADA: MÁS DE 90 DÍAS */}
               <div className="bg-red-50 p-6 rounded-3xl shadow-sm border border-red-100 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
                 <div className="absolute right-[-10%] top-[-10%] w-32 h-32 bg-red-500/5 rounded-full group-hover:scale-110 transition-transform duration-500 -z-0" />
                 
