@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, AlertTriangle, Download, Mail, Trophy, Bell, Skull, FileSpreadsheet } from 'lucide-react';
+import { Search, Database, TrendingUp, Filter, Clock, BadgeDollarSign, Car, BarChart3, ShieldAlert, Download, Mail, Trophy, Bell, AlertTriangle, Skull, FileSpreadsheet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import * as XLSX from 'xlsx';
 
@@ -28,7 +28,7 @@ const CPNY_MAP: Record<string, { nombre: string, sector: string }> = {
   '002': { nombre: 'KIA Iztapalapa', sector: 'AUTOS' },
   'MGINT': { nombre: 'MG Interlomas', sector: 'AUTOS' },
   'MGSFE': { nombre: 'MG Santa Fe', sector: 'AUTOS' },
-  'MGIZT': { nombre: 'MG Iztapalapa', sector: 'AUTOS' },
+  'MGIZT': { nombre: 'MG Iztapalapa', sector: 'AUTOS' }, 
   'MGCUA': { nombre: 'MG Cuajimalpa', sector: 'AUTOS' },
   'GWCUE': { nombre: 'GWM Cuernavaca', sector: 'AUTOS' },
   'GWIZT': { nombre: 'GWM Iztapalapa', sector: 'AUTOS' },
@@ -54,11 +54,10 @@ const getAgingColor = (dias: number): { bg: string; badge: string } => {
   return          { bg: 'bg-red-50',    badge: 'bg-red-100 text-red-800 border-red-200' };
 };
 
-// --- CORRECCIÓN AQUÍ: SE AGREGA EL AÑO MODELO AL EXCEL ---
 const exportToExcel = (rows: any[], filename: string) => {
   const exportData = rows.map(r => ({
     'Sucursal':  r.Sucursal,
-    'Año Modelo': r.Anio || 'N/A', // 👈 Nueva columna en la exportación
+    'Año Modelo': r.Anio || 'N/A',
     'Modelo':    r.Modelo,
     'Versión':   r.Versión,
     'VIN':       r.VIN,
@@ -240,15 +239,14 @@ export default function ClinicaInventarioFinal() {
       if (d.Categoría === 'DEMO PROPIO') totDemProp += Number(d.Costo) || 0;
     });
 
-    const montoMuro = dashboardData
-      .filter(d => d.Días > 90)
-      .reduce((acc, item) => acc + (Number(item.Costo) || 0), 0);
+    const baseMuroFiltrado = dashboardData.filter(d => d.Días > 90);
+    const muroConFiltroDeCategorias = catsMuro.length > 0 
+      ? baseMuroFiltrado.filter(d => catsMuro.includes(d.Categoría)) 
+      : baseMuroFiltrado;
 
-    const montoMuroFinanciero = dashboardData
-      .filter(d => d.Días > 90)
-      .reduce((acc, item) => acc + (Number(item.CostoFinanciero) || 0), 0);
-
-    const unidadesMuro = dashboardData.filter(d => d.Días > 90).length;
+    const montoMuro = muroConFiltroDeCategorias.reduce((acc, item) => acc + (Number(item.Costo) || 0), 0);
+    const montoMuroFinanciero = muroConFiltroDeCategorias.reduce((acc, item) => acc + (Number(item.CostoFinanciero) || 0), 0);
+    const unidadesMuro = muroConFiltroDeCategorias.length;
 
     return {
       unidades: new Intl.NumberFormat('en-US').format(dashboardData.length),
@@ -263,7 +261,7 @@ export default function ClinicaInventarioFinal() {
       montoMuroFinanciero,
       unidadesMuro
     };
-  }, [dashboardData]);
+  }, [dashboardData, catsMuro]);
 
   const agingData = useMemo(() => {
     let a0 = 0, a1 = 0, a2 = 0, a3 = 0;
@@ -540,7 +538,7 @@ ${alertasTexto || '  Sin alertas'}
                 <div className="text-[10px] text-amber-800/60 mt-2 font-black z-10 relative uppercase tracking-widest">(Propios + Demo Propios)</div>
               </div>
 
-              {/* TARJETA REDISEÑADA Y REESTRUCTURADA: MÁS DE 90 DÍAS */}
+              {/* TARJETA DINÁMICA: MÁS DE 90 DÍAS (CON SUMA TOTAL, CAPITAL E INTERESES REACTIVOS) */}
               <div className="bg-red-50 p-6 rounded-3xl shadow-sm border border-red-100 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
                 <div className="absolute right-[-10%] top-[-10%] w-32 h-32 bg-red-500/5 rounded-full group-hover:scale-110 transition-transform duration-500 -z-0" />
                 
@@ -549,22 +547,33 @@ ${alertasTexto || '  Sin alertas'}
                     <div className="p-2.5 bg-red-500 text-white rounded-[14px] shadow-md shadow-red-500/20">
                       <AlertTriangle size={20} />
                     </div>
-                    <h3 className="font-black uppercase tracking-wider text-[11px]">Más de 90 Días</h3>
+                    <h3 className="font-black uppercase tracking-wider text-[11px]">Muro de los Lamentos</h3>
                   </div>
                   <span className="text-[10px] font-black px-2 py-0.5 bg-red-600 text-white rounded-md uppercase tracking-tighter shadow-sm animate-pulse">
-                    Crítico 🔴
+                    {catsMuro.length > 0 ? 'Filtro Activo 📊' : 'Todo Crítico 🔴'}
                   </span>
                 </div>
 
-                <div className="z-10 relative">
-                  <p className="text-3xl font-black text-red-600 tracking-tight">
-                    {formatCurrencyM(stats.montoMuro)}
-                  </p>
-                  <p className="text-xs font-bold text-purple-600 mt-1">
-                    + {formatCurrencyM(stats.montoMuroFinanciero)} Costo Fin.
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-1.5 font-bold uppercase tracking-widest">
-                    Afectando a {stats.unidadesMuro} unidades
+                <div className="z-10 relative space-y-1">
+                  <div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Inversión Total (Suma)</span>
+                    <p className="text-3xl font-black text-red-600 tracking-tight">
+                      {formatCurrencyM(stats.montoMuro + stats.montoMuroFinanciero)}
+                    </p>
+                  </div>
+                  
+                  <div className="pt-2 border-t border-red-200/50 flex justify-between items-center text-xs font-bold">
+                    <span className="text-slate-500">Costo Auto (Capital):</span>
+                    <span className="text-slate-800 font-extrabold">{formatCurrencyM(stats.montoMuro)}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-purple-500">Intereses Plan Piso:</span>
+                    <span className="text-purple-600 font-extrabold">+{formatCurrencyM(stats.montoMuroFinanciero)}</span>
+                  </div>
+
+                  <p className="text-[10px] text-slate-400 pt-1 font-bold uppercase tracking-widest">
+                    Evaluando {stats.unidadesMuro} unidades del muro
                   </p>
                 </div>
               </div>
