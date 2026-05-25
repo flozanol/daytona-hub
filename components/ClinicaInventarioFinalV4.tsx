@@ -538,7 +538,7 @@ ${alertasTexto || '  Sin alertas'}
                 <div className="text-[10px] text-amber-800/60 mt-2 font-black z-10 relative uppercase tracking-widest">(Propios + Demo Propios)</div>
               </div>
 
-              {/* TARJETA DINÁMICA REMODELADA: MÁS DE 90 DÍAS */}
+              {/* TARJETA DINÁMICA: MÁS DE 90 DÍAS (REACTIVA AL FILTRO DEL MURO) */}
               <div className="bg-red-50 p-6 rounded-3xl shadow-sm border border-red-100 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
                 <div className="absolute right-[-10%] top-[-10%] w-32 h-32 bg-red-500/5 rounded-full group-hover:scale-110 transition-transform duration-500 -z-0" />
                 
@@ -675,22 +675,43 @@ ${alertasTexto || '  Sin alertas'}
               </div>
             )}
 
-            {/* 4. MURO DE LOS LAMENTOS */}
+            {/* 4. MURO DE LOS LAMENTOS CON TRES MONTOS EN LA CABECERA */}
             {dashboardData.some(d => d.Días > 90) && (
               <div className="bg-white p-6 rounded-3xl border-2 border-red-500 shadow-md relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-400" />
-                <div className="flex justify-between items-center mb-6">
+                
+                <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6 pb-4 border-b border-slate-100">
                   <div>
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Skull className="text-red-500" /> MURO DE LOS LAMENTOS</h2>
-                    <p className="text-xs text-slate-500">Pérdida por Plan de Piso Activo (+90 Días): <span className="font-bold text-red-600">{formatCurrency(stats.montoMuroFinanciero)}</span></p>
+                    <p className="text-xs text-slate-500 font-medium">Unidades en estado crítico de permanencia de piso</p>
                   </div>
+
+                  {/* NUEVOS CONTENEDORES DE MONTOS REACTIVOS EN LA CABECERA */}
+                  <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+                    <div className="text-left px-2">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Capital</span>
+                      <span className="text-sm font-black text-slate-800">{formatCurrency(stats.montoMuro)}</span>
+                    </div>
+                    <div className="w-px h-8 bg-slate-200" />
+                    <div className="text-left px-2">
+                      <span className="text-[9px] font-bold text-purple-400 uppercase block tracking-wider">Intereses</span>
+                      <span className="text-sm font-black text-purple-600">+{formatCurrency(stats.montoMuroFinanciero)}</span>
+                    </div>
+                    <div className="w-px h-8 bg-slate-200" />
+                    <div className="text-left bg-red-50 px-3 py-1 rounded-xl border border-red-100">
+                      <span className="text-[9px] font-bold text-red-500 uppercase block tracking-wider">Capital + Interés</span>
+                      <span className="text-base font-black text-red-600">{formatCurrency(stats.montoMuro + stats.montoMuroFinanciero)}</span>
+                    </div>
+                  </div>
+
                   <button
                     onClick={() => exportToExcel(muroLamentos, 'muro-lamentos-nuevos')}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-widest"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-sm uppercase tracking-widest self-start lg:self-center"
                   >
                     <FileSpreadsheet size={16} /> EXCEL
                   </button>
                 </div>
+
                 <div className="mb-4 flex items-center gap-3 flex-wrap">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtrar:</span>
                   <FilterMultiCat selected={catsMuro} onChange={setCatsMuro} />
