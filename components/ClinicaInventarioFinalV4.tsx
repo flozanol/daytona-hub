@@ -499,34 +499,53 @@ ${alertasTexto || '  Sin alertas'}
 
         {data.length > 0 && (
           <>
-            {/* 1. CARDS KPI PRINCIPALES EXPANDIDOS A 5 COLUMNAS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6">
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow">
+            {/* 1. CARDS KPI PRINCIPALES ALINEADOS Y PERECTAMENTE SIMÉTRICOS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6 items-stretch">
+              
+              {/* CARD 1: UNIDADES */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow h-full">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Database size={24} /></div>
                   <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Unidades Totales</h3>
                 </div>
-                <p className="text-3xl font-black text-slate-900 tracking-tight">{stats.unidades}</p>
+                <div className="flex-1 flex items-center min-h-[40px] my-2">
+                  <p className="text-3xl font-black text-slate-900 tracking-tight">{stats.unidades}</p>
+                </div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pt-1 border-t border-slate-50">
+                  Stock Real Disponible
+                </div>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow">
+              {/* CARD 2: INVERSIÓN BASE */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow h-full">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><BadgeDollarSign size={24} /></div>
                   <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Inversión Base</h3>
                 </div>
-                <p className="text-3xl font-black text-emerald-600 tracking-tight">{formatCurrencyM(stats.inversion)}</p>
+                <div className="flex-1 flex items-center min-h-[40px] my-2">
+                  <p className="text-3xl font-black text-emerald-600 tracking-tight">{formatCurrencyM(stats.inversion)}</p>
+                </div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pt-1 border-t border-slate-50">
+                  Costo de Compra Neto
+                </div>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow">
+              {/* CARD 3: COSTO FINANCIERO */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow h-full">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-3 bg-purple-50 text-purple-600 rounded-xl"><Clock size={24} /></div>
                   <h3 className="font-bold uppercase tracking-widest text-xs text-purple-500">Costo Fin. Total</h3>
                 </div>
-                <p className="text-3xl font-black text-purple-600 tracking-tight">{formatCurrencyM(stats.costoFinancieroTotal)}</p>
-                <div className="text-[10px] text-slate-400 mt-2 font-black uppercase tracking-widest">Tasa: {(TASA_ANUAL * 100).toFixed(4)}%</div>
+                <div className="flex-1 flex items-center min-h-[40px] my-2">
+                  <p className="text-3xl font-black text-purple-600 tracking-tight">{formatCurrencyM(stats.costoFinancieroTotal)}</p>
+                </div>
+                <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest pt-1 border-t border-slate-50">
+                  Tasa: {(TASA_ANUAL * 100).toFixed(4)}%
+                </div>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
+              {/* CARD 4: CAPITAL PROPIO */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group h-full">
                 <div className="absolute -right-6 -top-6 text-amber-50 opacity-50 group-hover:scale-110 transition-transform duration-500">
                   <TrendingUp size={120} strokeWidth={1} />
                 </div>
@@ -534,12 +553,16 @@ ${alertasTexto || '  Sin alertas'}
                   <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100"><TrendingUp size={24} /></div>
                   <h3 className="font-bold uppercase tracking-widest text-xs text-amber-600">Capital Propio</h3>
                 </div>
-                <p className="text-3xl font-black text-amber-600 tracking-tight z-10 relative">{formatCurrencyM(stats.capitalPropio)}</p>
-                <div className="text-[10px] text-amber-800/60 mt-2 font-black z-10 relative uppercase tracking-widest">(Propios + Demo Propios)</div>
+                <div className="flex-1 flex items-center min-h-[40px] my-2 z-10 relative">
+                  <p className="text-3xl font-black text-amber-600 tracking-tight">{formatCurrencyM(stats.capitalPropio)}</p>
+                </div>
+                <div className="text-[10px] text-amber-800/60 font-black z-10 relative uppercase tracking-widest pt-1 border-t border-slate-50">
+                  Propios + Demos
+                </div>
               </div>
 
-              {/* TARJETA DINÁMICA: MÁS DE 90 DÍAS (REACTIVA AL FILTRO DEL MURO) */}
-              <div className="bg-red-50 p-6 rounded-3xl shadow-sm border border-red-100 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
+              {/* CARD 5: MURO DE LOS LAMENTOS */}
+              <div className="bg-red-50 p-6 rounded-3xl shadow-sm border border-red-100 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group h-full">
                 <div className="absolute right-[-10%] top-[-10%] w-32 h-32 bg-red-500/5 rounded-full group-hover:scale-110 transition-transform duration-500 -z-0" />
                 
                 <div className="flex items-center justify-between mb-4 z-10 relative">
@@ -554,7 +577,7 @@ ${alertasTexto || '  Sin alertas'}
                   </span>
                 </div>
 
-                <div className="z-10 relative space-y-1">
+                <div className="flex-1 flex flex-col justify-center my-1 z-10 relative space-y-1">
                   <div>
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Inversión Total (Suma)</span>
                     <p className="text-3xl font-black text-red-600 tracking-tight">
@@ -563,20 +586,21 @@ ${alertasTexto || '  Sin alertas'}
                   </div>
                   
                   <div className="pt-2 border-t border-red-200/50 flex justify-between items-center text-xs font-bold">
-                    <span className="text-slate-500">Costo Auto (Capital):</span>
-                    <span className="text-slate-800 font-extrabold">{formatCurrencyM(stats.montoMuro)}</span>
+                    <span className="text-slate-400">Capital Base:</span>
+                    <span className="text-slate-700 font-extrabold">{formatCurrencyM(stats.montoMuro)}</span>
                   </div>
 
                   <div className="flex justify-between items-center text-xs font-bold">
-                    <span className="text-purple-500">Intereses Plan Piso:</span>
+                    <span className="text-purple-400">Intereses Devorados:</span>
                     <span className="text-purple-600 font-extrabold">+{formatCurrencyM(stats.montoMuroFinanciero)}</span>
                   </div>
+                </div>
 
-                  <p className="text-[10px] text-slate-400 pt-1 font-bold uppercase tracking-widest">
-                    Evaluando {stats.unidadesMuro} unidades del muro
-                  </p>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest z-10 relative pt-1 border-t border-red-200/30">
+                  Evaluando {stats.unidadesMuro} unidades del muro
                 </div>
               </div>
+
             </div>
 
             {/* 2. GRÁFICAS */}
@@ -611,7 +635,7 @@ ${alertasTexto || '  Sin alertas'}
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                       <XAxis dataKey="name" stroke="#64748b" fontSize={11} fontWeight={700} tickLine={false} axisLine={false} />
                       <YAxis stroke="#64748b" fontSize={11} fontWeight={700} tickLine={false} axisLine={false}
-                        tickFormatter={v => v >= 1000000 ? `$${(v/1000000).toFixed(0)}M` : `$${v/100}k`} />
+                        tickFormatter={v => v >= 1000000 ? `$${(v/1000000).toFixed(0)}M` : `$${v/1000}k`} />
                       <Tooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltipBar />} />
                       <Bar dataKey="value" radius={[6,6,6,6]}>
                         {capitalData.map((e, i) => <Cell key={i} fill={e.fill} />)}
@@ -686,7 +710,6 @@ ${alertasTexto || '  Sin alertas'}
                     <p className="text-xs text-slate-500 font-medium">Unidades en estado crítico de permanencia de piso</p>
                   </div>
 
-                  {/* NUEVOS CONTENEDORES DE MONTOS REACTIVOS EN LA CABECERA */}
                   <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
                     <div className="text-left px-2">
                       <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Capital</span>
@@ -746,7 +769,7 @@ ${alertasTexto || '  Sin alertas'}
                             <td className="px-4 py-3 font-bold text-slate-500 text-right">{formatCurrency(row.Costo)}</td>
                             <td className="px-4 py-3 font-bold text-purple-600 text-right">{formatCurrency(row.CostoFinanciero)}</td>
                             <td className="px-4 py-3 font-black text-red-600 text-right">{formatCurrency(row.InversionTotal)}</td>
-                            <td className="px-4 py-3 text-center"><span className="font-black text-red-600 bg-red-100 px-2 py-1 rounded-md">{row.Días} días</span></td>
+                            <td className="px-4 py-3 text-center"><span className="font-black text-red-600 bg-red-100 px-2 py-1 rounded-md">{row.Días} dias</span></td>
                             <td className="px-4 py-3 text-center">{getCategoryBadge(row.Categoría)}</td>
                           </tr>
                         );
