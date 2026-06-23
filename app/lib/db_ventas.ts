@@ -4,7 +4,7 @@ const config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   server: process.env.DB_SERVER || '',
-  database: 'Intranet',
+  database: process.env.DB_NAME,
   port: parseInt(process.env.DB_PORT || '1433'),
   options: {
     encrypt: true,
@@ -31,13 +31,12 @@ export interface VentaRow {
 }
 
 function normalizeRow(row: Record<string, unknown>): VentaRow {
-  const anioVal = row['Anio'] ?? row['A\u00f1o'] ?? row['ModelYr'] ?? 0;
   return {
     CpnyId:          String(row['CpnyId']   ?? '').trim(),
     Marca:           String(row['Marca']    ?? '').trim(),
     SubMarca:        String(row['SubMarca'] ?? '').trim(),
     Version:         String(row['Version']  ?? '').trim(),
-    Anio:            Number(anioVal),
+    Anio:            Number(row['Anio']     ?? 0),
     Color:           String(row['Color']    ?? '').trim(),
     Periodo_Menos_3: Number(row['Periodo_Menos_3'] ?? 0),
     Periodo_Menos_2: Number(row['Periodo_Menos_2'] ?? 0),
@@ -65,30 +64,32 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       candidates.find(c => cols.map(x => x.toLowerCase()).includes(c.toLowerCase())) ??
       candidates[0];
 
-    const anioCol    = find(['A\u00f1o', 'Anio', 'ModelYr', 'ANO']);
+    const anioCol     = find(['A\u00f1o', 'Anio', 'ModelYr', 'ANO']);
     const subMarcaCol = find(['SubMarca', 'SubBrandDescr']);
     const versionCol  = find(['Version', 'VersionDescr', 'Versi\u00f3n']);
     const colorCol    = find(['Color']);
-    const marcaCol    = find(['Marca']);
-    const cpnyCol     = find(['CpnyId']);
+    const marcaCol    = find(['Marca', 'BrandDescr']);
+    const cpnyCol     = find(['CpnyId', 'CpnyID']);
 
-    // PRE-AGREGAR inventario por (CpnyId, SubBrandDescr, VersionDescr, Color, ModelYr)
-    // InventoryAN tiene UNA FILA POR VIN — si no agrupamos, el JOIN multiplica ventas.
-    // SUM(QtyAF) + SUM(QtyAP) = total unidades físicas en inventario por combinación.
+    // Usamos dbo.Inventory (misma fuente que la Cl\u00ednica de Inventario)
+    // Pre-agrupamos por (CpnyID, SubBrandDescr, VersionDescr, Color, ModelYr)
+    // sumando QtyAF + QtyAP para obtener total de unidades f\u00edsicas en piso
     const result = await pool.request().query(`
       WITH InvAgrupado AS (
         SELECT
-          TRIM(CpnyId)        AS CpnyId,
-          TRIM(SubBrandDescr) AS SubBrandDescr,
-          TRIM(VersionDescr)  AS VersionDescr,
+          TRIM(CpnyID)        AS CpnyId,
+          TRIM(BrandDescr)    AS Marca,
+          TRIM(SubBrandDescr) AS SubMarca,
+          TRIM(VersionDescr)  AS Version,
+          ModelYr             AS Anio,
           TRIM(Color)         AS Color,
-          ModelYr,
           SUM(ISNULL(QtyAF, 0)) AS QtyAF,
           SUM(ISNULL(QtyAP, 0)) AS QtyAP
-        FROM dbo.InventoryAN
+        FROM dbo.Inventory
+        WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
         GROUP BY
-          TRIM(CpnyId), TRIM(SubBrandDescr), TRIM(VersionDescr),
-          TRIM(Color), ModelYr
+          TRIM(CpnyID), TRIM(BrandDescr), TRIM(SubBrandDescr),
+          TRIM(VersionDescr), ModelYr, TRIM(Color)
       )
       SELECT
         TRIM(v.[${cpnyCol}])      AS CpnyId,
@@ -106,11 +107,11 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
         ISNULL(inv.QtyAF, 0) + ISNULL(inv.QtyAP, 0) AS Inventario
       FROM dbo.vw_VentasUltimos4Periodos v
       LEFT JOIN InvAgrupado inv
-        ON  inv.CpnyId        = TRIM(v.[${cpnyCol}])
-        AND inv.SubBrandDescr = TRIM(v.[${subMarcaCol}])
-        AND inv.VersionDescr  = TRIM(v.[${versionCol}])
-        AND inv.Color         = TRIM(v.[${colorCol}])
-        AND inv.ModelYr       = v.[${anioCol}]
+        ON  inv.CpnyId   = TRIM(v.[${cpnyCol}])
+        AND inv.SubMarca = TRIM(v.[${subMarcaCol}])
+        AND inv.Version  = TRIM(v.[${versionCol}])
+        AND inv.Color    = TRIM(v.[${colorCol}])
+        AND inv.Anio     = v.[${anioCol}]
       ORDER BY v.[${subMarcaCol}], v.[${versionCol}], v.[${anioCol}], v.[${colorCol}]
     `);
 
