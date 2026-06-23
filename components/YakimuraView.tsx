@@ -50,26 +50,10 @@ const Badge = ({ n }: { n: number }) => {
   return <span className="inline-block bg-gray-200 text-gray-500 text-xs px-2.5 py-0.5 rounded-md">✔ OK</span>;
 };
 
-// Celda de inventario con desglose AF/AP
-const InvCell = ({ total, af, ap, small = false }: { total: number; af: number; ap: number; small?: boolean }) => (
-  <div className="flex flex-col items-center leading-tight">
-    <span className={`font-black ${small ? 'text-xs' : 'text-sm'} ${
-      total > 0 ? 'text-amber-600' : 'text-gray-300'
-    }`}>{total}</span>
-    {total > 0 && (
-      <span className={`${small ? 'text-[10px]' : 'text-xs'} text-gray-400 whitespace-nowrap`}>
-        <span className="text-blue-500 font-semibold">{af}F</span>
-        {' / '}
-        <span className="text-emerald-600 font-semibold">{ap}P</span>
-      </span>
-    )}
-  </div>
-);
-
 export default function YakimuraView() {
   const [data, setData] = useState<VentaRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<{ msg: string; details?: string } | null>(null);
   const [mesOptimo, setMesOptimo] = useState(1.5);
   const [expandido, setExpandido] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
@@ -80,8 +64,21 @@ export default function YakimuraView() {
   useEffect(() => {
     fetch('/api/yakimura')
       .then(r => r.json())
-      .then(d => { setData(Array.isArray(d) ? d : []); setLoading(false); })
-      .catch(() => { setError('No se pudo conectar al servidor SQL'); setLoading(false); });
+      .then(d => {
+        if (Array.isArray(d)) {
+          setData(d);
+        } else if (d?.error) {
+          // La API devolvió un error SQL — mostrarlo completo
+          setError({ msg: d.error, details: d.details });
+        } else {
+          setError({ msg: 'Respuesta inesperada del servidor', details: JSON.stringify(d) });
+        }
+        setLoading(false);
+      })
+      .catch(e => {
+        setError({ msg: 'No se pudo contactar la API', details: e?.message });
+        setLoading(false);
+      });
   }, []);
 
   const marcas = useMemo(() => ['Todas', ...Array.from(new Set(data.map(r => r.Marca))).sort()], [data]);
@@ -102,23 +99,17 @@ export default function YakimuraView() {
           totalVentas: 0, promedio: 0, qtyAF: 0, qtyAP: 0, inventario: 0, colores: [] };
       }
       const ventas3m = (row.Periodo_Menos_3 ?? 0) + (row.Periodo_Menos_2 ?? 0) + (row.Periodo_Menos_1 ?? 0);
-      map[key].p3         += row.Periodo_Menos_3 ?? 0;
-      map[key].p2         += row.Periodo_Menos_2 ?? 0;
-      map[key].p1         += row.Periodo_Menos_1 ?? 0;
+      map[key].p3          += row.Periodo_Menos_3 ?? 0;
+      map[key].p2          += row.Periodo_Menos_2 ?? 0;
+      map[key].p1          += row.Periodo_Menos_1 ?? 0;
       map[key].totalVentas += ventas3m;
-      map[key].qtyAF      += row.QtyAF ?? 0;
-      map[key].qtyAP      += row.QtyAP ?? 0;
-      map[key].inventario += row.Inventario ?? 0;
+      map[key].qtyAF       += row.QtyAF ?? 0;
+      map[key].qtyAP       += row.QtyAP ?? 0;
+      map[key].inventario  += row.Inventario ?? 0;
       map[key].colores.push({
-        Color: row.Color,
-        p3: row.Periodo_Menos_3 ?? 0,
-        p2: row.Periodo_Menos_2 ?? 0,
-        p1: row.Periodo_Menos_1 ?? 0,
-        ventas3m,
-        promedio: ventas3m / 3,
-        qtyAF: row.QtyAF ?? 0,
-        qtyAP: row.QtyAP ?? 0,
-        inventario: row.Inventario ?? 0,
+        Color: row.Color, p3: row.Periodo_Menos_3 ?? 0, p2: row.Periodo_Menos_2 ?? 0,
+        p1: row.Periodo_Menos_1 ?? 0, ventas3m, promedio: ventas3m / 3,
+        qtyAF: row.QtyAF ?? 0, qtyAP: row.QtyAP ?? 0, inventario: row.Inventario ?? 0,
       });
     });
     return Object.values(map).map(g => ({ ...g, promedio: g.totalVentas / 3 }));
@@ -132,10 +123,10 @@ export default function YakimuraView() {
     .filter(g => !soloComprar || calcComprar(g.promedio, g.inventario) > 0)
     .sort((a, b) => calcComprar(b.promedio, b.inventario) - calcComprar(a.promedio, a.inventario));
 
-  const totalComprar   = grupos.reduce((s, g) => s + Math.max(0, calcComprar(g.promedio, g.inventario)), 0);
+  const totalComprar    = grupos.reduce((s, g) => s + Math.max(0, calcComprar(g.promedio, g.inventario)), 0);
   const totalInventario = grupos.reduce((s, g) => s + g.inventario, 0);
-  const totalAF        = grupos.reduce((s, g) => s + g.qtyAF, 0);
-  const totalAP        = grupos.reduce((s, g) => s + g.qtyAP, 0);
+  const totalAF         = grupos.reduce((s, g) => s + g.qtyAF, 0);
+  const totalAP         = grupos.reduce((s, g) => s + g.qtyAP, 0);
 
   const exportarExcel = () => {
     const filas: string[][] = [];
@@ -167,15 +158,20 @@ export default function YakimuraView() {
   );
 
   if (error) return (
-    <div className="flex flex-col items-center justify-center h-full py-24 text-red-600">
-      <p className="text-4xl mb-3">❌</p><p className="font-bold">{error}</p>
+    <div className="max-w-2xl mx-auto mt-16 p-6 bg-red-50 border border-red-200 rounded-2xl">
+      <p className="text-red-700 font-black text-lg mb-2">❌ Error de conexión SQL</p>
+      <p className="text-red-600 font-semibold mb-3">{error.msg}</p>
+      {error.details && (
+        <pre className="bg-red-100 text-red-800 text-xs p-4 rounded-xl overflow-x-auto whitespace-pre-wrap break-all">{error.details}</pre>
+      )}
+      <p className="text-xs text-red-400 mt-4">
+        Verifica las variables de entorno en Vercel: <code className="bg-red-100 px-1 rounded">DB_SERVER</code>, <code className="bg-red-100 px-1 rounded">DB_USER</code>, <code className="bg-red-100 px-1 rounded">DB_PASSWORD</code>, <code className="bg-red-100 px-1 rounded">DB_PORT</code>
+      </p>
     </div>
   );
 
   return (
     <div className="p-6 md:p-8 max-w-screen-xl mx-auto">
-
-      {/* HEADER */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-[#003366] flex items-center gap-2">🏭 Yakimura</h1>
@@ -190,7 +186,6 @@ export default function YakimuraView() {
         </button>
       </div>
 
-      {/* KPIs */}
       <div className="flex flex-wrap gap-4 mb-6">
         <div className="bg-white border border-gray-100 rounded-xl px-5 py-3 shadow-sm min-w-[150px]">
           <div className="text-2xl font-black text-[#003366]">{grupos.length}</div>
@@ -215,7 +210,6 @@ export default function YakimuraView() {
         </div>
       </div>
 
-      {/* FILTROS */}
       <div className="flex flex-wrap gap-3 mb-5 items-center">
         <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
           <span className="text-xs font-black text-gray-500 uppercase tracking-wide">Marca</span>
@@ -247,13 +241,11 @@ export default function YakimuraView() {
         <span className="ml-auto text-xs text-gray-400">{filtrados.length} versiones</span>
       </div>
 
-      {/* TABLA */}
       <div className="rounded-2xl border border-gray-200 shadow-sm overflow-hidden overflow-x-auto bg-white">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-[#003366] text-white">
-              {['Agencia','Marca','Modelo','Versión','Año',
-                'Mes -3','Mes -2','Mes -1','Prom./mes',
+              {['Agencia','Marca','Modelo','Versión','Año','Mes -3','Mes -2','Mes -1','Prom./mes',
                 'Inv. total','Financiados','Propios','Pedir','Colores'].map(h => (
                 <th key={h} className="px-3 py-3 font-bold whitespace-nowrap text-left">{h}</th>
               ))}
@@ -293,7 +285,6 @@ export default function YakimuraView() {
                       </button>
                     </td>
                   </tr>
-
                   {isOpen && (
                     <tr key={`${g.key}-det`}>
                       <td colSpan={14} className="bg-indigo-50 px-6 pb-4 pt-1">
@@ -344,7 +335,6 @@ export default function YakimuraView() {
           </tbody>
         </table>
       </div>
-
       <p className="mt-3 text-xs text-gray-400">
         Datos en tiempo real · SQL Server · Intranet · vw_VentasUltimos4Periodos ✕ InventoryAN
       </p>
