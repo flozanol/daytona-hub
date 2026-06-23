@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Target, ArrowRight } from 'lucide-react';
+import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Target, ArrowRight, TrendingUp, Factory } from 'lucide-react';
 import MinutaBoard from '../components/MinutaBoard';
 import AutosNuevosWrapper from '../components/AutosNuevosWrapper';
 
@@ -14,7 +14,12 @@ export default function DaytonaHub() {
     { id: 'nuevos', name: 'Autos Nuevos', url: 'https://flozanol.github.io/daytona-autos-nuevos-kpis/', icon: Car, status: 'Conectado (API Sheets)' },
     { id: 'seminuevos', name: 'Seminuevos', url: 'https://flozanol.github.io/daytona-seminuevos-kpis/', icon: Key, status: 'Conectado (API Sheets)' },
     { id: 'postventa', name: 'Postventa', url: 'https://daytona-postventa-kpis.vercel.app/', icon: Wrench, status: 'Conectado (CSV Hub)' },
-    { id: 'marketing', name: 'Marketing', url: 'https://daytona-marketing-dashboard.vercel.app/', icon: Megaphone, status: 'Conectado (Supabase DB)' }
+    { id: 'marketing', name: 'Marketing', url: 'https://daytona-marketing-dashboard.vercel.app/', icon: Megaphone, status: 'Conectado (Supabase DB)' },
+    { id: 'ventas', name: 'Ventas', icon: TrendingUp, status: 'Conectado (SQL Server)' },
+  ];
+
+  const ventasModulos = [
+    { id: 'yakimura', name: 'Yakimura', description: 'Pedido a planta — análisis de inventario vs. ventas por versión y color', icon: Factory, href: '/ventas/yakimura', status: 'SQL Server · Intranet' },
   ];
 
   const activeApp = dashboards.find(d => d.id === activeTab);
@@ -114,16 +119,49 @@ export default function DaytonaHub() {
             <MinutaBoard />
 
           </div>
+
+        ) : activeTab === 'ventas' ? (
+          /* MÓDULO VENTAS */
+          <div className="max-w-5xl mx-auto p-6 md:p-10 animate-in fade-in duration-500">
+            <div className="mb-8">
+              <h2 className="text-2xl font-black text-[#003366] tracking-tight flex items-center gap-3">
+                <TrendingUp size={26} className="text-[#003366]" /> Módulo de Ventas
+              </h2>
+              <p className="text-gray-500 mt-1 text-sm font-medium">Herramientas de análisis y pedido a planta conectadas a SQL Server en tiempo real.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {ventasModulos.map((mod) => {
+                const Icon = mod.icon;
+                return (
+                  <a
+                    key={mod.id}
+                    href={mod.href}
+                    className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-200 transition-all group flex flex-col gap-4 no-underline"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="bg-indigo-50 p-3 rounded-xl text-indigo-700">
+                        <Icon size={24} />
+                      </div>
+                      <ArrowRight size={20} className="text-gray-300 group-hover:text-[#fd0019] transition-colors mt-1" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-gray-900 tracking-tight">{mod.name}</h3>
+                      <p className="text-sm text-gray-500 mt-1 leading-relaxed">{mod.description}</p>
+                    </div>
+                    <p className="text-xs font-bold text-emerald-600 flex items-center gap-1.5 mt-auto">
+                      <Database size={12} /> {mod.status}
+                    </p>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+
         ) : activeTab === 'nuevos' ? (
           <AutosNuevosWrapper activeApp={activeApp} />
         ) : activeTab === 'seminuevos' ? (
           <div className="p-6 w-full">
             <div className="flex flex-col h-[85vh] w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-              {/* Aquí cargamos tu portal COMPLETO de GitHub. 
-                 Para que la clínica sea automática, lo ideal sería que en tu código de GitHub 
-                 el link de "Clínica de Inventario" apunte a "/seminuevos-aut" 
-                 en lugar de "clinica inventario.html"
-              */}
               <iframe 
                 src="https://flozanol.github.io/daytona-seminuevos-kpis/" 
                 className="w-full h-full border-none"
