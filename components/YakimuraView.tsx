@@ -13,6 +13,8 @@ interface VentaRow {
   Periodo_Menos_2: number;
   Periodo_Menos_1: number;
   Periodo_Actual: number;
+  QtyAF: number;
+  QtyAP: number;
   Inventario: number;
 }
 
@@ -21,6 +23,8 @@ interface ColorRow {
   p3: number; p2: number; p1: number;
   ventas3m: number;
   promedio: number;
+  qtyAF: number;
+  qtyAP: number;
   inventario: number;
 }
 
@@ -34,6 +38,8 @@ interface VersionGroup {
   p3: number; p2: number; p1: number;
   totalVentas: number;
   promedio: number;
+  qtyAF: number;
+  qtyAP: number;
   inventario: number;
   colores: ColorRow[];
 }
@@ -43,6 +49,22 @@ const Badge = ({ n }: { n: number }) => {
   if (n < 0) return <span className="inline-block bg-red-100 text-red-700 text-xs font-black px-2.5 py-0.5 rounded-md">{n} SOBRA</span>;
   return <span className="inline-block bg-gray-200 text-gray-500 text-xs px-2.5 py-0.5 rounded-md">✔ OK</span>;
 };
+
+// Celda de inventario con desglose AF/AP
+const InvCell = ({ total, af, ap, small = false }: { total: number; af: number; ap: number; small?: boolean }) => (
+  <div className="flex flex-col items-center leading-tight">
+    <span className={`font-black ${small ? 'text-xs' : 'text-sm'} ${
+      total > 0 ? 'text-amber-600' : 'text-gray-300'
+    }`}>{total}</span>
+    {total > 0 && (
+      <span className={`${small ? 'text-[10px]' : 'text-xs'} text-gray-400 whitespace-nowrap`}>
+        <span className="text-blue-500 font-semibold">{af}F</span>
+        {' / '}
+        <span className="text-emerald-600 font-semibold">{ap}P</span>
+      </span>
+    )}
+  </div>
+);
 
 export default function YakimuraView() {
   const [data, setData] = useState<VentaRow[]>([]);
@@ -77,13 +99,15 @@ export default function YakimuraView() {
       if (!map[key]) {
         map[key] = { key, CpnyId: row.CpnyId, Marca: row.Marca, SubMarca: row.SubMarca,
           Version: row.Version, Anio: row.Anio, p3: 0, p2: 0, p1: 0,
-          totalVentas: 0, promedio: 0, inventario: 0, colores: [] };
+          totalVentas: 0, promedio: 0, qtyAF: 0, qtyAP: 0, inventario: 0, colores: [] };
       }
       const ventas3m = (row.Periodo_Menos_3 ?? 0) + (row.Periodo_Menos_2 ?? 0) + (row.Periodo_Menos_1 ?? 0);
-      map[key].p3 += row.Periodo_Menos_3 ?? 0;
-      map[key].p2 += row.Periodo_Menos_2 ?? 0;
-      map[key].p1 += row.Periodo_Menos_1 ?? 0;
+      map[key].p3         += row.Periodo_Menos_3 ?? 0;
+      map[key].p2         += row.Periodo_Menos_2 ?? 0;
+      map[key].p1         += row.Periodo_Menos_1 ?? 0;
       map[key].totalVentas += ventas3m;
+      map[key].qtyAF      += row.QtyAF ?? 0;
+      map[key].qtyAP      += row.QtyAP ?? 0;
       map[key].inventario += row.Inventario ?? 0;
       map[key].colores.push({
         Color: row.Color,
@@ -92,13 +116,14 @@ export default function YakimuraView() {
         p1: row.Periodo_Menos_1 ?? 0,
         ventas3m,
         promedio: ventas3m / 3,
+        qtyAF: row.QtyAF ?? 0,
+        qtyAP: row.QtyAP ?? 0,
         inventario: row.Inventario ?? 0,
       });
     });
     return Object.values(map).map(g => ({ ...g, promedio: g.totalVentas / 3 }));
   }, [datosFiltrados]);
 
-  // Fórmula real: Pedir = ceil(Promedio × MesOptimo) - Inventario
   const calcComprar = (promedio: number, inventario: number) =>
     Math.ceil(promedio * mesOptimo) - inventario;
 
@@ -107,22 +132,24 @@ export default function YakimuraView() {
     .filter(g => !soloComprar || calcComprar(g.promedio, g.inventario) > 0)
     .sort((a, b) => calcComprar(b.promedio, b.inventario) - calcComprar(a.promedio, a.inventario));
 
-  const totalComprar = grupos.reduce((s, g) => s + Math.max(0, calcComprar(g.promedio, g.inventario)), 0);
+  const totalComprar   = grupos.reduce((s, g) => s + Math.max(0, calcComprar(g.promedio, g.inventario)), 0);
   const totalInventario = grupos.reduce((s, g) => s + g.inventario, 0);
+  const totalAF        = grupos.reduce((s, g) => s + g.qtyAF, 0);
+  const totalAP        = grupos.reduce((s, g) => s + g.qtyAP, 0);
 
-  // ---- EXPORTAR CSV / Excel ----
   const exportarExcel = () => {
     const filas: string[][] = [];
     filas.push(['Agencia','Marca','Modelo','Versión','Año','Color',
-      'Mes -3','Mes -2','Mes -1','Total 3M','Prom./mes','Inventario actual','Pedir']);
+      'Mes -3','Mes -2','Mes -1','Total 3M','Prom./mes',
+      'Financiados (AF)','Propios (AP)','Inventario total','Pedir']);
     filtrados.forEach(g => {
       filas.push([g.CpnyId, g.Marca, g.SubMarca, g.Version, String(g.Anio), 'TOTAL VERSION',
-        String(g.p3), String(g.p2), String(g.p1), String(g.totalVentas),
-        g.promedio.toFixed(1), String(g.inventario), String(calcComprar(g.promedio, g.inventario))]);
-      g.colores.slice().sort((a,b) => b.ventas3m - a.ventas3m).forEach(c => {
+        String(g.p3), String(g.p2), String(g.p1), String(g.totalVentas), g.promedio.toFixed(1),
+        String(g.qtyAF), String(g.qtyAP), String(g.inventario), String(calcComprar(g.promedio, g.inventario))]);
+      g.colores.slice().sort((a, b) => b.ventas3m - a.ventas3m).forEach(c => {
         filas.push([g.CpnyId, g.Marca, g.SubMarca, g.Version, String(g.Anio), c.Color,
-          String(c.p3), String(c.p2), String(c.p1), String(c.ventas3m),
-          c.promedio.toFixed(1), String(c.inventario), String(calcComprar(c.promedio, c.inventario))]);
+          String(c.p3), String(c.p2), String(c.p1), String(c.ventas3m), c.promedio.toFixed(1),
+          String(c.qtyAF), String(c.qtyAP), String(c.inventario), String(calcComprar(c.promedio, c.inventario))]);
       });
     });
     const csv = '\uFEFF' + filas.map(f => f.map(v => `"${v.replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -151,34 +178,41 @@ export default function YakimuraView() {
       {/* HEADER */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-[#003366] flex items-center gap-2">
-            🏭 Yakimura
-          </h1>
+          <h1 className="text-2xl font-black text-[#003366] flex items-center gap-2">🏭 Yakimura</h1>
           <p className="text-gray-500 text-sm mt-1">
             Pedido a planta — fórmula: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-indigo-700 text-xs font-mono">Pedir = ceil(Promedio × MesÓptimo) − Inventario</code>
+            <span className="ml-3 text-xs"><span className="text-blue-500 font-bold">●F</span> = Financiados &nbsp;<span className="text-emerald-600 font-bold">●P</span> = Propios</span>
           </p>
         </div>
-        <button
-          onClick={exportarExcel}
-          className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm"
-        >
+        <button onClick={exportarExcel}
+          className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm">
           📥 Exportar a Excel
         </button>
       </div>
 
       {/* KPIs */}
       <div className="flex flex-wrap gap-4 mb-6">
-        {[
-          { label: 'Versiones analizadas', value: grupos.length, color: 'text-[#003366]' },
-          { label: 'Inventario total actual', value: totalInventario, color: 'text-amber-600' },
-          { label: 'Unidades a pedir', value: totalComprar, color: 'text-green-700' },
-          { label: 'Mes óptimo', value: `×${mesOptimo}`, color: 'text-indigo-700' },
-        ].map(k => (
-          <div key={k.label} className="bg-white border border-gray-100 rounded-xl px-5 py-3 shadow-sm min-w-[150px]">
-            <div className={`text-2xl font-black ${k.color}`}>{k.value}</div>
-            <div className="text-xs text-gray-400 mt-0.5">{k.label}</div>
+        <div className="bg-white border border-gray-100 rounded-xl px-5 py-3 shadow-sm min-w-[150px]">
+          <div className="text-2xl font-black text-[#003366]">{grupos.length}</div>
+          <div className="text-xs text-gray-400 mt-0.5">Versiones analizadas</div>
+        </div>
+        <div className="bg-white border border-gray-100 rounded-xl px-5 py-3 shadow-sm min-w-[180px]">
+          <div className="text-2xl font-black text-amber-600">{totalInventario}</div>
+          <div className="text-xs text-gray-400 mt-0.5">Inventario total</div>
+          <div className="text-xs mt-1">
+            <span className="text-blue-500 font-bold">{totalAF} Financiados</span>
+            <span className="text-gray-300 mx-1">/</span>
+            <span className="text-emerald-600 font-bold">{totalAP} Propios</span>
           </div>
-        ))}
+        </div>
+        <div className="bg-white border border-gray-100 rounded-xl px-5 py-3 shadow-sm min-w-[150px]">
+          <div className="text-2xl font-black text-green-700">{totalComprar}</div>
+          <div className="text-xs text-gray-400 mt-0.5">Unidades a pedir</div>
+        </div>
+        <div className="bg-white border border-gray-100 rounded-xl px-5 py-3 shadow-sm min-w-[150px]">
+          <div className="text-2xl font-black text-indigo-700">×{mesOptimo}</div>
+          <div className="text-xs text-gray-400 mt-0.5">Mes óptimo</div>
+        </div>
       </div>
 
       {/* FILTROS */}
@@ -220,25 +254,23 @@ export default function YakimuraView() {
             <tr className="bg-[#003366] text-white">
               {['Agencia','Marca','Modelo','Versión','Año',
                 'Mes -3','Mes -2','Mes -1','Prom./mes',
-                'Inv. actual','Pedir','Colores'].map(h => (
+                'Inv. total','Financiados','Propios','Pedir','Colores'].map(h => (
                 <th key={h} className="px-3 py-3 font-bold whitespace-nowrap text-left">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filtrados.length === 0 && (
-              <tr><td colSpan={12} className="py-16 text-center text-gray-400">No hay resultados.</td></tr>
+              <tr><td colSpan={14} className="py-16 text-center text-gray-400">No hay resultados.</td></tr>
             )}
             {filtrados.map((g, i) => {
               const comprar = calcComprar(g.promedio, g.inventario);
-              const isOpen = expandido === g.key;
+              const isOpen  = expandido === g.key;
               return (
                 <>
-                  <tr key={g.key}
-                    className={`border-b border-gray-100 transition-colors ${
-                      isOpen ? 'bg-indigo-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    } hover:bg-indigo-50`}
-                  >
+                  <tr key={g.key} className={`border-b border-gray-100 transition-colors ${
+                    isOpen ? 'bg-indigo-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                  } hover:bg-indigo-50`}>
                     <td className="px-3 py-2.5 text-xs text-gray-400 font-mono">{g.CpnyId}</td>
                     <td className="px-3 py-2.5 font-bold text-[#003366]">{g.Marca}</td>
                     <td className="px-3 py-2.5 font-bold">{g.SubMarca}</td>
@@ -248,19 +280,15 @@ export default function YakimuraView() {
                     <td className="px-3 py-2.5 text-center">{g.p2}</td>
                     <td className="px-3 py-2.5 text-center">{g.p1}</td>
                     <td className="px-3 py-2.5 text-center font-black">{g.promedio.toFixed(1)}</td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className={`inline-block font-black text-sm ${
-                        g.inventario > 0 ? 'text-amber-600' : 'text-gray-300'
-                      }`}>{g.inventario}</span>
-                    </td>
+                    <td className="px-3 py-2.5 text-center font-black text-amber-600">{g.inventario}</td>
+                    <td className="px-3 py-2.5 text-center font-bold text-blue-500">{g.qtyAF}</td>
+                    <td className="px-3 py-2.5 text-center font-bold text-emerald-600">{g.qtyAP}</td>
                     <td className="px-3 py-2.5 text-center"><Badge n={comprar} /></td>
                     <td className="px-3 py-2.5 text-center">
-                      <button
-                        onClick={() => setExpandido(isOpen ? null : g.key)}
+                      <button onClick={() => setExpandido(isOpen ? null : g.key)}
                         className={`text-xs font-bold px-3 py-1 rounded-lg transition-colors ${
                           isOpen ? 'bg-indigo-600 text-white' : 'bg-[#003366] text-white hover:bg-indigo-700'
-                        }`}
-                      >
+                        }`}>
                         {isOpen ? '▲ Ocultar' : '▼ Ver colores'}
                       </button>
                     </td>
@@ -268,32 +296,31 @@ export default function YakimuraView() {
 
                   {isOpen && (
                     <tr key={`${g.key}-det`}>
-                      <td colSpan={12} className="bg-indigo-50 px-6 pb-4 pt-1">
+                      <td colSpan={14} className="bg-indigo-50 px-6 pb-4 pt-1">
                         <table className="w-full text-xs border-collapse">
                           <thead>
                             <tr className="text-indigo-700 border-b-2 border-indigo-200">
-                              {['🎨 Color','Mes -3','Mes -2','Mes -1','Total 3M','Prom./mes','Inv. actual','% modelo','Pedir'].map(h => (
+                              {['🎨 Color','Mes -3','Mes -2','Mes -1','Total 3M','Prom./mes',
+                                'Inv. total','Financiados','Propios','% modelo','Pedir'].map(h => (
                                 <th key={h} className="px-2 py-1.5 text-left font-black">{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {g.colores.slice().sort((a, b) => b.ventas3m - a.ventas3m).map(c => {
-                              const pct = g.totalVentas > 0 ? Math.round((c.ventas3m / g.totalVentas) * 100) : 0;
+                              const pct      = g.totalVentas > 0 ? Math.round((c.ventas3m / g.totalVentas) * 100) : 0;
                               const cComprar = calcComprar(c.promedio, c.inventario);
                               return (
-                                <tr key={c.Color} className="border-b border-indigo-100">
+                                <tr key={c.Color} className="border-b border-indigo-100 hover:bg-indigo-100">
                                   <td className="px-2 py-1.5 font-semibold text-[#003366]">{c.Color || '(sin color)'}</td>
                                   <td className="px-2 py-1.5 text-center text-gray-500">{c.p3}</td>
                                   <td className="px-2 py-1.5 text-center text-gray-500">{c.p2}</td>
                                   <td className="px-2 py-1.5 text-center text-gray-500">{c.p1}</td>
                                   <td className="px-2 py-1.5 text-center font-bold">{c.ventas3m}</td>
                                   <td className="px-2 py-1.5 text-center font-bold">{c.promedio.toFixed(1)}</td>
-                                  <td className="px-2 py-1.5 text-center">
-                                    <span className={`font-black ${
-                                      c.inventario > 0 ? 'text-amber-600' : 'text-gray-300'
-                                    }`}>{c.inventario}</span>
-                                  </td>
+                                  <td className="px-2 py-1.5 text-center font-black text-amber-600">{c.inventario}</td>
+                                  <td className="px-2 py-1.5 text-center font-bold text-blue-500">{c.qtyAF}</td>
+                                  <td className="px-2 py-1.5 text-center font-bold text-emerald-600">{c.qtyAP}</td>
                                   <td className="px-2 py-1.5">
                                     <div className="flex items-center gap-1.5">
                                       <div className="bg-indigo-200 rounded h-1.5 w-16 overflow-hidden">

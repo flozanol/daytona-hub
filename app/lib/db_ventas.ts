@@ -25,6 +25,8 @@ export interface VentaRow {
   Periodo_Menos_2: number;
   Periodo_Menos_1: number;
   Periodo_Actual: number;
+  QtyAF: number;
+  QtyAP: number;
   Inventario: number;
 }
 
@@ -43,7 +45,9 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
         ISNULL(v.Periodo_Menos_2, 0) AS Periodo_Menos_2,
         ISNULL(v.Periodo_Menos_1, 0) AS Periodo_Menos_1,
         ISNULL(v.Periodo_Actual,  0) AS Periodo_Actual,
-        ISNULL(i.QtyAF, 0) + ISNULL(i.QtyAP, 0) AS Inventario
+        ISNULL(i.QtyAF, 0)                           AS QtyAF,
+        ISNULL(i.QtyAP, 0)                           AS QtyAP,
+        ISNULL(i.QtyAF, 0) + ISNULL(i.QtyAP, 0)     AS Inventario
       FROM dbo.vw_VentasUltimos4Periodos v
       LEFT JOIN dbo.InventoryAN i
         ON  TRIM(i.CpnyId)   = TRIM(v.CpnyId)
