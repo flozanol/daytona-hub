@@ -2,9 +2,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Target, ArrowRight, TrendingUp, Factory } from 'lucide-react';
+import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Target, ArrowRight, Factory } from 'lucide-react';
 import MinutaBoard from '../components/MinutaBoard';
 import AutosNuevosWrapper from '../components/AutosNuevosWrapper';
+import YakimuraView from '../components/YakimuraView';
 
 export default function DaytonaHub() {
   const [activeTab, setActiveTab] = useState('resumen');
@@ -15,11 +16,7 @@ export default function DaytonaHub() {
     { id: 'seminuevos', name: 'Seminuevos', url: 'https://flozanol.github.io/daytona-seminuevos-kpis/', icon: Key, status: 'Conectado (API Sheets)' },
     { id: 'postventa', name: 'Postventa', url: 'https://daytona-postventa-kpis.vercel.app/', icon: Wrench, status: 'Conectado (CSV Hub)' },
     { id: 'marketing', name: 'Marketing', url: 'https://daytona-marketing-dashboard.vercel.app/', icon: Megaphone, status: 'Conectado (Supabase DB)' },
-    { id: 'ventas', name: 'Ventas', icon: TrendingUp, status: 'Conectado (SQL Server)' },
-  ];
-
-  const ventasModulos = [
-    { id: 'yakimura', name: 'Yakimura', description: 'Pedido a planta — análisis de inventario vs. ventas por versión y color', icon: Factory, href: '/ventas/yakimura', status: 'SQL Server · Intranet' },
+    { id: 'yakimura', name: 'Yakimura', icon: Factory, status: 'Conectado (SQL Server)' },
   ];
 
   const activeApp = dashboards.find(d => d.id === activeTab);
@@ -27,36 +24,29 @@ export default function DaytonaHub() {
   return (
     <div className="flex flex-col h-screen w-full bg-[#F4F6F8] overflow-hidden font-sans antialiased">
 
-      {/* BARRA SUPERIOR (TOP BAR) */}
+      {/* BARRA SUPERIOR */}
       <header className="bg-[#003366] text-white shadow-lg z-20 shrink-0">
         <div className="flex flex-col md:flex-row justify-between items-center px-6 py-3">
-
           <div className="flex items-center gap-4 mb-4 md:mb-0">
             <img
               src="https://grupodaytona.com/_next/image?url=https%3A%2F%2Fapi.grupodaytona.com%2Ffiles%2Fimages%2Ffull-xzLxpZqXUE-1728519042236.png&w=384&q=75"
-              alt="Daytona"
-              className="w-32"
+              alt="Daytona" className="w-32"
             />
             <div className="h-8 w-px bg-white/20 hidden md:block"></div>
             <div className="hidden md:flex items-center gap-2 text-white/90">
               <span className="font-bold tracking-widest text-sm uppercase">Business Intelligence Hub</span>
             </div>
           </div>
-
           <nav className="flex gap-1 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 hide-scrollbar">
             {dashboards.map((app) => {
               const Icon = app.icon;
               const isActive = activeTab === app.id;
-
               return (
                 <button
                   key={app.id}
                   onClick={() => setActiveTab(app.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap
-                    ${isActive
-                      ? 'bg-white text-[#003366] shadow-md scale-105'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
-                    }`}
+                    ${isActive ? 'bg-white text-[#003366] shadow-md scale-105' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                 >
                   <Icon size={16} />
                   {app.name}
@@ -70,10 +60,8 @@ export default function DaytonaHub() {
       {/* ÁREA PRINCIPAL */}
       <main className="flex-1 w-full relative overflow-y-auto bg-gray-50">
 
-        {/* PANTALLA DE BIENVENIDA EJECUTIVA */}
-        {activeTab === 'resumen' ? (
+        {activeTab === 'resumen' && (
           <div className="max-w-7xl mx-auto p-6 md:p-10 animate-in fade-in duration-500">
-
             <div className="mb-10 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 relative overflow-hidden">
               <div className="absolute top-0 right-0 p-8 opacity-5 text-[#003366]"><LayoutDashboard size={180} /></div>
               <div className="relative z-10">
@@ -86,7 +74,6 @@ export default function DaytonaHub() {
                 </p>
               </div>
             </div>
-
             <div className="mb-10">
               <h2 className="text-sm font-black text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2">
                 <Target size={18} className="text-[#fd0019]" /> Acceso Instantáneo a Datos Reales
@@ -110,72 +97,32 @@ export default function DaytonaHub() {
                       </p>
                       <p className="text-sm text-gray-500 mt-3 font-medium">Haga clic para ver el desglose detallado e interactivo.</p>
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
-
-            {/* MINUTAS BOARD */}
             <MinutaBoard />
-
           </div>
+        )}
 
-        ) : activeTab === 'ventas' ? (
-          /* MÓDULO VENTAS */
-          <div className="max-w-5xl mx-auto p-6 md:p-10 animate-in fade-in duration-500">
-            <div className="mb-8">
-              <h2 className="text-2xl font-black text-[#003366] tracking-tight flex items-center gap-3">
-                <TrendingUp size={26} className="text-[#003366]" /> Módulo de Ventas
-              </h2>
-              <p className="text-gray-500 mt-1 text-sm font-medium">Herramientas de análisis y pedido a planta conectadas a SQL Server en tiempo real.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {ventasModulos.map((mod) => {
-                const Icon = mod.icon;
-                return (
-                  <a
-                    key={mod.id}
-                    href={mod.href}
-                    className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-200 transition-all group flex flex-col gap-4 no-underline"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="bg-indigo-50 p-3 rounded-xl text-indigo-700">
-                        <Icon size={24} />
-                      </div>
-                      <ArrowRight size={20} className="text-gray-300 group-hover:text-[#fd0019] transition-colors mt-1" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black text-gray-900 tracking-tight">{mod.name}</h3>
-                      <p className="text-sm text-gray-500 mt-1 leading-relaxed">{mod.description}</p>
-                    </div>
-                    <p className="text-xs font-bold text-emerald-600 flex items-center gap-1.5 mt-auto">
-                      <Database size={12} /> {mod.status}
-                    </p>
-                  </a>
-                );
-              })}
-            </div>
-          </div>
+        {activeTab === 'yakimura' && <YakimuraView />}
 
-        ) : activeTab === 'nuevos' ? (
-          <AutosNuevosWrapper activeApp={activeApp} />
-        ) : activeTab === 'seminuevos' ? (
+        {activeTab === 'nuevos' && <AutosNuevosWrapper activeApp={activeApp} />}
+
+        {activeTab === 'seminuevos' && (
           <div className="p-6 w-full">
             <div className="flex flex-col h-[85vh] w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-              <iframe 
-                src="https://flozanol.github.io/daytona-seminuevos-kpis/" 
-                className="w-full h-full border-none"
-              />
+              <iframe src="https://flozanol.github.io/daytona-seminuevos-kpis/" className="w-full h-full border-none" />
             </div>
           </div>
-        ) : (
-          /* MODO IFRAME (Carga el Dashboard Seleccionado) */
+        )}
+
+        {activeTab !== 'resumen' && activeTab !== 'yakimura' && activeTab !== 'nuevos' && activeTab !== 'seminuevos' && (
           <>
             <div className="absolute inset-0 flex flex-col items-center justify-center -z-10 bg-gray-50">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003366] mb-4"></div>
               <p className="text-[#003366] font-bold text-sm tracking-widest uppercase">Cargando Módulo {activeApp?.name}...</p>
             </div>
-
             {activeApp?.url && (
               <iframe
                 src={activeApp.url}
@@ -187,7 +134,6 @@ export default function DaytonaHub() {
           </>
         )}
       </main>
-
     </div>
   );
 }
