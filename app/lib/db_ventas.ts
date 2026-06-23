@@ -1,10 +1,11 @@
 import sql from 'mssql';
 
+// Conexión fija a Intranet — donde vive vw_VentasUltimos4Periodos
 const config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   server: process.env.DB_SERVER || '',
-  database: process.env.DB_NAME,
+  database: 'Intranet',
   port: parseInt(process.env.DB_PORT || '1433'),
   options: {
     encrypt: true,
@@ -71,9 +72,11 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
     const marcaCol    = find(['Marca', 'BrandDescr']);
     const cpnyCol     = find(['CpnyId', 'CpnyID']);
 
-    // Usamos dbo.Inventory (misma fuente que la Cl\u00ednica de Inventario)
-    // Pre-agrupamos por (CpnyID, SubBrandDescr, VersionDescr, Color, ModelYr)
-    // sumando QtyAF + QtyAP para obtener total de unidades f\u00edsicas en piso
+    // Inventory vive en DB_NAME (misma que usa la Clínica).
+    // Usamos nombre de 3 partes: [DB_NAME].dbo.Inventory para cross-database query
+    // desde la conexión a Intranet.
+    const invDb = process.env.DB_NAME || 'Intranet';
+
     const result = await pool.request().query(`
       WITH InvAgrupado AS (
         SELECT
@@ -85,7 +88,7 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
           TRIM(Color)         AS Color,
           SUM(ISNULL(QtyAF, 0)) AS QtyAF,
           SUM(ISNULL(QtyAP, 0)) AS QtyAP
-        FROM dbo.Inventory
+        FROM [${invDb}].dbo.Inventory
         WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
         GROUP BY
           TRIM(CpnyID), TRIM(BrandDescr), TRIM(SubBrandDescr),
