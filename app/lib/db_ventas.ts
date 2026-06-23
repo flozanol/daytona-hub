@@ -30,17 +30,15 @@ export interface VentaRow {
   Inventario: number;
 }
 
-// Normaliza fila cruda — la vista de ventas puede llamar al año 'Año', 'Anio', etc.
 function normalizeRow(row: Record<string, unknown>): VentaRow {
   const anioVal =
-    row['Año'] ?? row['Anio'] ?? row['AÑO'] ?? row['ANO'] ?? row['año'] ?? row['anio'] ??
-    row['ModelYr'] ?? 0;
+    row['Año'] ?? row['Anio'] ?? row['ModelYr'] ?? row['modelyr'] ?? 0;
 
   return {
     CpnyId:          String(row['CpnyId']   ?? '').trim(),
     Marca:           String(row['Marca']    ?? '').trim(),
-    SubMarca:        String(row['SubMarca'] ?? row['Submarca'] ?? '').trim(),
-    Version:         String(row['Version']  ?? row['Versión']  ?? '').trim(),
+    SubMarca:        String(row['SubMarca'] ?? row['SubBrandDescr'] ?? '').trim(),
+    Version:         String(row['Version']  ?? row['VersionDescr'] ?? row['Versión'] ?? '').trim(),
     Anio:            Number(anioVal),
     Color:           String(row['Color']    ?? '').trim(),
     Periodo_Menos_3: Number(row['Periodo_Menos_3'] ?? 0),
@@ -57,7 +55,7 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
   try {
     const pool = await sql.connect(config as sql.config);
 
-    // Detectar nombre real del campo año en vw_VentasUltimos4Periodos
+    // Detectar nombre real de columna año en vw_VentasUltimos4Periodos
     const colResult = await pool.request().query(
       'SELECT TOP 1 * FROM dbo.vw_VentasUltimos4Periodos'
     );
@@ -65,24 +63,48 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       ? Object.keys(colResult.recordset[0])
       : [];
 
+    // Buscar la columna de año por orden de prioridad
     const anioColVentas =
       cols.find(c => c === 'Año') ??
       cols.find(c => c === 'Anio') ??
+      cols.find(c => c === 'ModelYr') ??
       cols.find(c => c.toLowerCase() === 'año') ??
       cols.find(c => c.toLowerCase() === 'anio') ??
       cols.find(c => c.toLowerCase() === 'modelyr') ??
-      cols.find(c => c.toLowerCase() === 'ano') ??
+      cols.find(c => c.toLowerCase().includes('a') && c.toLowerCase().includes('o') && c.length <= 5) ??
       'Año';
 
-    // InventoryAN usa ModelYr como columna de año (confirmado)
+    // Detectar nombre real de columna SubMarca en vw_VentasUltimos4Periodos
+    const subMarcaCol =
+      cols.find(c => c === 'SubMarca') ??
+      cols.find(c => c === 'SubBrandDescr') ??
+      cols.find(c => c.toLowerCase() === 'submarca') ??
+      cols.find(c => c.toLowerCase() === 'subbranddescr') ??
+      'SubMarca';
+
+    // Detectar nombre real de columna Version en vw_VentasUltimos4Periodos
+    const versionCol =
+      cols.find(c => c === 'Version') ??
+      cols.find(c => c === 'VersionDescr') ??
+      cols.find(c => c === 'Versión') ??
+      cols.find(c => c.toLowerCase() === 'version') ??
+      cols.find(c => c.toLowerCase() === 'versiondescr') ??
+      'Version';
+
+    // Detectar columna Color
+    const colorCol =
+      cols.find(c => c === 'Color') ??
+      cols.find(c => c.toLowerCase() === 'color') ??
+      'Color';
+
     const result = await pool.request().query(`
       SELECT
-        TRIM(v.CpnyId)   AS CpnyId,
-        TRIM(v.Marca)    AS Marca,
-        TRIM(v.SubMarca) AS SubMarca,
-        TRIM(v.Version)  AS Version,
-        v.[${anioColVentas}]   AS Anio,
-        TRIM(v.Color)    AS Color,
+        TRIM(v.CpnyId)              AS CpnyId,
+        TRIM(v.Marca)               AS Marca,
+        TRIM(v.[${subMarcaCol}])    AS SubMarca,
+        TRIM(v.[${versionCol}])     AS Version,
+        v.[${anioColVentas}]        AS Anio,
+        TRIM(v.[${colorCol}])       AS Color,
         ISNULL(v.Periodo_Menos_3, 0) AS Periodo_Menos_3,
         ISNULL(v.Periodo_Menos_2, 0) AS Periodo_Menos_2,
         ISNULL(v.Periodo_Menos_1, 0) AS Periodo_Menos_1,
@@ -92,12 +114,12 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
         ISNULL(i.QtyAF, 0) + ISNULL(i.QtyAP, 0)  AS Inventario
       FROM dbo.vw_VentasUltimos4Periodos v
       LEFT JOIN dbo.InventoryAN i
-        ON  TRIM(i.CpnyId)   = TRIM(v.CpnyId)
-        AND TRIM(i.SubMarca) = TRIM(v.SubMarca)
-        AND TRIM(i.Version)  = TRIM(v.Version)
-        AND TRIM(i.Color)    = TRIM(v.Color)
-        AND i.ModelYr        = v.[${anioColVentas}]
-      ORDER BY v.SubMarca, v.Version, v.[${anioColVentas}], v.Color
+        ON  TRIM(i.CpnyId)          = TRIM(v.CpnyId)
+        AND TRIM(i.SubBrandDescr)   = TRIM(v.[${subMarcaCol}])
+        AND TRIM(i.VersionDescr)    = TRIM(v.[${versionCol}])
+        AND TRIM(i.Color)           = TRIM(v.[${colorCol}])
+        AND i.ModelYr               = v.[${anioColVentas}]
+      ORDER BY v.[${subMarcaCol}], v.[${versionCol}], v.[${anioColVentas}], v.[${colorCol}]
     `);
 
     return (result.recordset as Record<string, unknown>[]).map(normalizeRow);
