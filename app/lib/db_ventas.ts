@@ -65,7 +65,7 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
 
     // Detectar nombres reales de columnas
     const colResult = await poolIntranet.request().query(
-      'SELECT TOP 1 * FROM dbo.vw_VentasUltimos4Periodos'
+            'USE Intranet; SELECT TOP 1 * FROM dbo.vw_VentasUltimos4Periodos'
     );
     const cols: string[] = colResult.recordset.length > 0
       ? Object.keys(colResult.recordset[0]) : [];
@@ -85,6 +85,7 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
     // Obtener ventas desde Intranet
     const ventasResult = await poolIntranet.request().query(`
       SELECT
+            USE Intranet;
         TRIM([${cpnyCol}])      AS CpnyId,
         TRIM([${marcaCol}])     AS Marca,
         TRIM([${subMarcaCol}])  AS SubMarca,
