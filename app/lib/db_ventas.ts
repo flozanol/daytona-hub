@@ -16,7 +16,7 @@ const configBSC: sql.config = {
 const configIntranet: sql.config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER || '',
+      server: process.env.DB_SERVER_INTRANET || process.env.DB_SERVER || '',
   database: process.env.DB_NAME_INTRANET || 'Intranet',
   port: parseInt(process.env.DB_PORT || '1433'),
   options: { encrypt: true, trustServerCertificate: true },
