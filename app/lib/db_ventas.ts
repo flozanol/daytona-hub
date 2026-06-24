@@ -16,8 +16,8 @@ const configBSC: sql.config = {
 const configIntranet: sql.config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-          server: process.env.DB_SERVER || '',
-      database: 'Intranet',
+  server: process.env.DB_SERVER || '',
+  database: 'Intranet',
   port: parseInt(process.env.DB_PORT || '1433'),
   options: { encrypt: true, trustServerCertificate: true },
   connectionTimeout: 30000,
@@ -65,7 +65,7 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
 
     // Detectar nombres reales de columnas
     const colResult = await poolIntranet.request().query(
-            'USE Intranet; SELECT TOP 1 * FROM dbo.vw_VentasUltimos4Periodos'
+      'USE Intranet; SELECT TOP 1 * FROM dbo.vw_VentasUltimos4Periodos'
     );
     const cols: string[] = colResult.recordset.length > 0
       ? Object.keys(colResult.recordset[0]) : [];
@@ -84,18 +84,18 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
 
     // Obtener ventas desde Intranet
     const ventasResult = await poolIntranet.request().query(`
+      USE Intranet;
       SELECT
-            USE Intranet;
-        TRIM([${cpnyCol}])      AS CpnyId,
-        TRIM([${marcaCol}])     AS Marca,
-        TRIM([${subMarcaCol}])  AS SubMarca,
-        TRIM([${versionCol}])   AS Version,
-        [${anioCol}]            AS Anio,
-        TRIM([${colorCol}])     AS Color,
-        ISNULL(Periodo_Menos_3, 0) AS Periodo_Menos_3,
-        ISNULL(Periodo_Menos_2, 0) AS Periodo_Menos_2,
-        ISNULL(Periodo_Menos_1, 0) AS Periodo_Menos_1,
-        ISNULL(Periodo_Actual,  0) AS Periodo_Actual
+        LTRIM(RTRIM([${cpnyCol}]))    AS CpnyId,
+        LTRIM(RTRIM([${marcaCol}]))   AS Marca,
+        LTRIM(RTRIM([${subMarcaCol}])) AS SubMarca,
+        LTRIM(RTRIM([${versionCol}])) AS Version,
+        [${anioCol}]                  AS Anio,
+        LTRIM(RTRIM([${colorCol}]))   AS Color,
+        ISNULL(Periodo_Menos_3, 0)    AS Periodo_Menos_3,
+        ISNULL(Periodo_Menos_2, 0)    AS Periodo_Menos_2,
+        ISNULL(Periodo_Menos_1, 0)    AS Periodo_Menos_1,
+        ISNULL(Periodo_Actual, 0)     AS Periodo_Actual
       FROM dbo.vw_VentasUltimos4Periodos
       ORDER BY [${subMarcaCol}], [${versionCol}], [${anioCol}], [${colorCol}]
     `);
@@ -104,18 +104,21 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
     const poolBSC = await sql.connect(configBSC);
     const invResult = await poolBSC.request().query(`
       SELECT
-        TRIM(CpnyID)        AS CpnyId,
-        TRIM(SubBrandDescr) AS SubMarca,
-        TRIM(VersionDescr)  AS Version,
-        ModelYr             AS Anio,
-        TRIM(Color)         AS Color,
-        SUM(ISNULL(QtyAF, 0)) AS QtyAF,
-        SUM(ISNULL(QtyAP, 0)) AS QtyAP
+        LTRIM(RTRIM(CpnyID))        AS CpnyId,
+        LTRIM(RTRIM(SubBrandDescr)) AS SubMarca,
+        LTRIM(RTRIM(VersionDescr))  AS Version,
+        ModelYr                     AS Anio,
+        LTRIM(RTRIM(Color))         AS Color,
+        SUM(ISNULL(QtyAF, 0))       AS QtyAF,
+        SUM(ISNULL(QtyAP, 0))       AS QtyAP
       FROM dbo.Inventory
       WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
       GROUP BY
-        TRIM(CpnyID), TRIM(SubBrandDescr),
-        TRIM(VersionDescr), ModelYr, TRIM(Color)
+        LTRIM(RTRIM(CpnyID)),
+        LTRIM(RTRIM(SubBrandDescr)),
+        LTRIM(RTRIM(VersionDescr)),
+        ModelYr,
+        LTRIM(RTRIM(Color))
     `);
 
     // Hacer el JOIN en memoria
