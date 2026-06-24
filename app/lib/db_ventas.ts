@@ -123,27 +123,29 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       invMap.set(key, inv);
     }
 
-    // Contar cuantas filas de ventas comparten cada clave CpnyId|SubMarca|Anio
-    const ventasRows = ventasResult.recordset as Record<string, unknown>[];
-    const keyCount = new Map<string, number>();
-    for (const v of ventasRows) {
-      const key = `${String(v['CpnyId']??'').trim()}|${String(v['SubMarca']??'').trim()}|${Number(v['Anio']??0)}`.toLowerCase();
-      keyCount.set(key, (keyCount.get(key) ?? 0) + 1);
-    }
+    // Registrar que clave ya recibio su inventario (solo asignar en la primera fila del grupo)
+    const keyUsed = new Set<string>();
 
-    // JOIN: distribuir inventario total entre las filas que comparten la misma clave
+    const ventasRows = ventasResult.recordset as Record<string, unknown>[];
     const merged = ventasRows.map(v => {
       const key = `${String(v['CpnyId']??'').trim()}|${String(v['SubMarca']??'').trim()}|${Number(v['Anio']??0)}`.toLowerCase();
       const inv = invMap.get(key);
-      const count = keyCount.get(key) ?? 1;
-      const totalInv = inv ? (inv.QtyAF + inv.QtyAP) : 0;
-      const totalAF  = inv ? inv.QtyAF : 0;
-      const totalAP  = inv ? inv.QtyAP : 0;
+      if (inv && !keyUsed.has(key)) {
+        // Primera aparicion de esta clave: asignar inventario completo
+        keyUsed.add(key);
+        return {
+          ...v,
+          QtyAF:      inv.QtyAF,
+          QtyAP:      inv.QtyAP,
+          Inventario: inv.QtyAF + inv.QtyAP,
+        };
+      }
+      // Filas subsecuentes del mismo grupo: inventario 0 para evitar duplicacion
       return {
         ...v,
-        QtyAF:      Math.round(totalAF  / count),
-        QtyAP:      Math.round(totalAP  / count),
-        Inventario: Math.round(totalInv / count),
+        QtyAF:      0,
+        QtyAP:      0,
+        Inventario: 0,
       };
     });
 
