@@ -75,7 +75,7 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       candidates.find(c => cols.map(x => x.toLowerCase()).includes(c.toLowerCase())) ??
       candidates[0];
 
-    const anioCol     = find(['Año', 'Anio', 'ModelYr', 'ANO']);
+    const anioCol     = find(['Áño', 'Año', 'Anio', 'ModelYr', 'ANO']);
     const subMarcaCol = find(['SubMarca', 'SubBrandDescr']);
     const versionCol  = find(['Version', 'VersionDescr', 'Versión']);
     const colorCol    = find(['Color']);
@@ -102,11 +102,11 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
     // Inventario desde BSC: agrupado por CpnyId + SubMarca + Anio
     const invResult = await poolBSC.request().query(`
       SELECT
-        LTRIM(RTRIM(CpnyID))       AS CpnyId,
+        LTRIM(RTRIM(CpnyID))        AS CpnyId,
         LTRIM(RTRIM(SubBrandDescr)) AS SubMarca,
-        ModelYr                    AS Anio,
-        SUM(ISNULL(QtyAF, 0))      AS QtyAF,
-        SUM(ISNULL(QtyAP, 0))      AS QtyAP
+        ModelYr                     AS Anio,
+        SUM(ISNULL(QtyAF, 0))       AS QtyAF,
+        SUM(ISNULL(QtyAP, 0))       AS QtyAP
       FROM dbo.Inventory
       WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
       GROUP BY
@@ -115,7 +115,7 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
         ModelYr
     `);
 
-    // JOIN en memoria por CpnyId + SubMarca + Anio
+    // Construir mapa de inventario por CpnyId|SubMarca|Anio
     type InvRow = { CpnyId: string; SubMarca: string; Anio: number; QtyAF: number; QtyAP: number };
     const invMap = new Map<string, InvRow>();
     for (const inv of invResult.recordset as InvRow[]) {
@@ -123,14 +123,27 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       invMap.set(key, inv);
     }
 
-    const merged = (ventasResult.recordset as Record<string, unknown>[]).map(v => {
+    // Contar cuantas filas de ventas comparten cada clave CpnyId|SubMarca|Anio
+    const ventasRows = ventasResult.recordset as Record<string, unknown>[];
+    const keyCount = new Map<string, number>();
+    for (const v of ventasRows) {
+      const key = `${String(v['CpnyId']??'').trim()}|${String(v['SubMarca']??'').trim()}|${Number(v['Anio']??0)}`.toLowerCase();
+      keyCount.set(key, (keyCount.get(key) ?? 0) + 1);
+    }
+
+    // JOIN: distribuir inventario total entre las filas que comparten la misma clave
+    const merged = ventasRows.map(v => {
       const key = `${String(v['CpnyId']??'').trim()}|${String(v['SubMarca']??'').trim()}|${Number(v['Anio']??0)}`.toLowerCase();
       const inv = invMap.get(key);
+      const count = keyCount.get(key) ?? 1;
+      const totalInv = inv ? (inv.QtyAF + inv.QtyAP) : 0;
+      const totalAF  = inv ? inv.QtyAF : 0;
+      const totalAP  = inv ? inv.QtyAP : 0;
       return {
         ...v,
-        QtyAF:      inv?.QtyAF ?? 0,
-        QtyAP:      inv?.QtyAP ?? 0,
-        Inventario: (inv?.QtyAF ?? 0) + (inv?.QtyAP ?? 0),
+        QtyAF:      Math.round(totalAF  / count),
+        QtyAP:      Math.round(totalAP  / count),
+        Inventario: Math.round(totalInv / count),
       };
     });
 
