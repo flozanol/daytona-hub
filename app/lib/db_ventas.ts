@@ -99,37 +99,36 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       ORDER BY [${subMarcaCol}], [${versionCol}], [${anioCol}], [${colorCol}]
     `);
 
-    // Inventario desde BSC: agrupar por CpnyId + SubBrandDescr + Anio
-    // SubBrandDescr en Inventory corresponde a SubMarca en vw_VentasUltimos4Periodos
+    // Inventario desde BSC: agrupar solo por CpnyId + SubBrandDescr (sin Anio)
+    // SubBrandDescr en Inventory = SubMarca en vw_VentasUltimos4Periodos
+    // Se omite Anio del JOIN porque el año modelo en inventario puede diferir del año en ventas
     const invResult = await poolBSC.request().query(`
       SELECT
         LTRIM(RTRIM(CpnyID))        AS CpnyId,
         LTRIM(RTRIM(SubBrandDescr)) AS SubMarca,
-        ModelYr                     AS Anio,
         SUM(ISNULL(QtyAF, 0))       AS QtyAF,
         SUM(ISNULL(QtyAP, 0))       AS QtyAP
       FROM dbo.Inventory
       WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
       GROUP BY
         LTRIM(RTRIM(CpnyID)),
-        LTRIM(RTRIM(SubBrandDescr)),
-        ModelYr
+        LTRIM(RTRIM(SubBrandDescr))
     `);
 
-    // Construir mapa de inventario por CpnyId|SubMarca|Anio
-    type InvRow = { CpnyId: string; SubMarca: string; Anio: number; QtyAF: number; QtyAP: number };
+    // Construir mapa de inventario por CpnyId|SubMarca (sin Anio)
+    type InvRow = { CpnyId: string; SubMarca: string; QtyAF: number; QtyAP: number };
     const invMap = new Map<string, InvRow>();
     for (const inv of invResult.recordset as InvRow[]) {
-      const key = `${inv.CpnyId}|${inv.SubMarca}|${inv.Anio}`.toLowerCase();
+      const key = `${inv.CpnyId}|${inv.SubMarca}`.toLowerCase();
       invMap.set(key, inv);
     }
 
-    // Solo asignar inventario en la primera fila del grupo CpnyId|SubMarca|Anio
+    // Solo asignar inventario en la primera fila del grupo CpnyId|SubMarca
     // Las filas subsecuentes reciben 0 para evitar duplicacion en sumatorias
     const keyUsed = new Set<string>();
     const ventasRows = ventasResult.recordset as Record<string, unknown>[];
     const merged = ventasRows.map(v => {
-      const key = `${String(v['CpnyId']??'').trim()}|${String(v['SubMarca']??'').trim()}|${Number(v['Anio']??0)}`.toLowerCase();
+      const key = `${String(v['CpnyId']??'').trim()}|${String(v['SubMarca']??'').trim()}`.toLowerCase();
       const inv = invMap.get(key);
       if (inv && !keyUsed.has(key)) {
         keyUsed.add(key);
