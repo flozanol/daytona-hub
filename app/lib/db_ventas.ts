@@ -36,9 +36,6 @@ export interface VentaRow {
   QtyAF: number;
   QtyAP: number;
   Inventario: number;
-  // Debug: columnas reales de inventario BSC
-  _invSubBrand?: string;
-  _invBrand?: string;
 }
 
 function normalizeRow(row: Record<string, unknown>): VentaRow {
@@ -102,59 +99,38 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       ORDER BY [${subMarcaCol}], [${versionCol}], [${anioCol}], [${colorCol}]
     `);
 
-    // Inventario desde BSC: exponer SubBrandDescr y columnas disponibles para diagnostico
-    // IMPORTANTE: necesitamos saber que columna usar para hacer JOIN con SubMarca de ventas
-    const invSample = await poolBSC.request().query(
-      'SELECT TOP 1 * FROM dbo.Inventory'
-    );
-    const invCols = invSample.recordset.length > 0 ? Object.keys(invSample.recordset[0]) : [];
-    // Detectar columna de marca en Inventory
-    const invBrandCol = invCols.find(c => c.toLowerCase() === 'branddescr') ??
-                        invCols.find(c => c.toLowerCase().includes('brand') && !c.toLowerCase().includes('sub')) ??
-                        'SubBrandDescr';
-    const invSubBrandCol = invCols.find(c => c.toLowerCase() === 'subranddescr') ??
-                           invCols.find(c => c.toLowerCase().includes('subbrand')) ??
-                           'SubBrandDescr';
-
+    // Inventario desde BSC: agrupar por CpnyId + SubBrandDescr + Anio
+    // SubBrandDescr en Inventory corresponde a SubMarca en vw_VentasUltimos4Periodos
     const invResult = await poolBSC.request().query(`
       SELECT
-        LTRIM(RTRIM(CpnyID))              AS CpnyId,
-        LTRIM(RTRIM([${invBrandCol}]))    AS SubMarca,
-        LTRIM(RTRIM([${invSubBrandCol}])) AS SubBrandDescr,
-        ModelYr                           AS Anio,
-        SUM(ISNULL(QtyAF, 0))             AS QtyAF,
-        SUM(ISNULL(QtyAP, 0))             AS QtyAP
+        LTRIM(RTRIM(CpnyID))        AS CpnyId,
+        LTRIM(RTRIM(SubBrandDescr)) AS SubMarca,
+        ModelYr                     AS Anio,
+        SUM(ISNULL(QtyAF, 0))       AS QtyAF,
+        SUM(ISNULL(QtyAP, 0))       AS QtyAP
       FROM dbo.Inventory
       WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
       GROUP BY
         LTRIM(RTRIM(CpnyID)),
-        LTRIM(RTRIM([${invBrandCol}])),
-        LTRIM(RTRIM([${invSubBrandCol}])),
+        LTRIM(RTRIM(SubBrandDescr)),
         ModelYr
     `);
 
     // Construir mapa de inventario por CpnyId|SubMarca|Anio
-    type InvRow = { CpnyId: string; SubMarca: string; SubBrandDescr: string; Anio: number; QtyAF: number; QtyAP: number };
-    const invMap = new Map<string, InvRow[]>();
+    type InvRow = { CpnyId: string; SubMarca: string; Anio: number; QtyAF: number; QtyAP: number };
+    const invMap = new Map<string, InvRow>();
     for (const inv of invResult.recordset as InvRow[]) {
       const key = `${inv.CpnyId}|${inv.SubMarca}|${inv.Anio}`.toLowerCase();
-      if (!invMap.has(key)) invMap.set(key, []);
-      invMap.get(key)!.push(inv);
-    }
-
-    // Consolidar totales por clave
-    const invTotals = new Map<string, { QtyAF: number; QtyAP: number }>();
-    for (const [key, rows] of invMap.entries()) {
-      const total = rows.reduce((acc, r) => ({ QtyAF: acc.QtyAF + r.QtyAF, QtyAP: acc.QtyAP + r.QtyAP }), { QtyAF: 0, QtyAP: 0 });
-      invTotals.set(key, total);
+      invMap.set(key, inv);
     }
 
     // Solo asignar inventario en la primera fila del grupo CpnyId|SubMarca|Anio
+    // Las filas subsecuentes reciben 0 para evitar duplicacion en sumatorias
     const keyUsed = new Set<string>();
     const ventasRows = ventasResult.recordset as Record<string, unknown>[];
     const merged = ventasRows.map(v => {
       const key = `${String(v['CpnyId']??'').trim()}|${String(v['SubMarca']??'').trim()}|${Number(v['Anio']??0)}`.toLowerCase();
-      const inv = invTotals.get(key);
+      const inv = invMap.get(key);
       if (inv && !keyUsed.has(key)) {
         keyUsed.add(key);
         return {
@@ -176,17 +152,5 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
   } finally {
     await poolIntranet.close().catch(() => {});
     await poolBSC.close().catch(() => {});
-  }
-}
-
-// Funcion auxiliar para diagnostico - exporta columnas reales de inventario
-export async function getInventoryColumns(): Promise<string[]> {
-  const pool = new sql.ConnectionPool(configBSC);
-  try {
-    await pool.connect();
-    const result = await pool.request().query('SELECT TOP 1 * FROM dbo.Inventory');
-    return result.recordset.length > 0 ? Object.keys(result.recordset[0]) : [];
-  } finally {
-    await pool.close().catch(() => {});
   }
 }
