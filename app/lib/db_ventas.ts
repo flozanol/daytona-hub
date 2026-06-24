@@ -1,16 +1,25 @@
 import sql from 'mssql';
 
-// Conexión al servidor dedicado (mismo que usa db.ts para Inventory)
-const config = {
+// Conexión a BSC (inventario: Inventory, InventoryUsed)
+const configBSC: sql.config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   server: process.env.DB_SERVER || '',
-  database: process.env.DB_NAME || 'Intranet',
+  database: process.env.DB_NAME || 'BSC',
   port: parseInt(process.env.DB_PORT || '1433'),
-  options: {
-    encrypt: true,
-    trustServerCertificate: true,
-  },
+  options: { encrypt: true, trustServerCertificate: true },
+  connectionTimeout: 30000,
+  requestTimeout: 30000,
+};
+
+// Conexión a Intranet (ventas: vw_VentasUltimos4Periodos)
+const configIntranet: sql.config = {
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  server: process.env.DB_SERVER || '',
+  database: process.env.DB_NAME_INTRANET || 'Intranet',
+  port: parseInt(process.env.DB_PORT || '1433'),
+  options: { encrypt: true, trustServerCertificate: true },
   connectionTimeout: 30000,
   requestTimeout: 30000,
 };
@@ -51,10 +60,11 @@ function normalizeRow(row: Record<string, unknown>): VentaRow {
 
 export async function getVentasYakimura(): Promise<VentaRow[]> {
   try {
-    const pool = await sql.connect(config as sql.config);
+    // Pool para ventas (Intranet)
+    const poolIntranet = await sql.connect(configIntranet);
 
-    // Detectar nombres reales de columnas en vw_VentasUltimos4Periodos
-    const colResult = await pool.request().query(
+    // Detectar nombres reales de columnas
+    const colResult = await poolIntranet.request().query(
       'SELECT TOP 1 * FROM dbo.vw_VentasUltimos4Periodos'
     );
     const cols: string[] = colResult.recordset.length > 0
@@ -72,48 +82,61 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
     const marcaCol    = find(['Marca', 'BrandDescr']);
     const cpnyCol     = find(['CpnyId', 'CpnyID']);
 
-    const result = await pool.request().query(`
-      WITH InvAgrupado AS (
-        SELECT
-          TRIM(CpnyID)        AS CpnyId,
-          TRIM(BrandDescr)    AS Marca,
-          TRIM(SubBrandDescr) AS SubMarca,
-          TRIM(VersionDescr)  AS Version,
-          ModelYr             AS Anio,
-          TRIM(Color)         AS Color,
-          SUM(ISNULL(QtyAF, 0)) AS QtyAF,
-          SUM(ISNULL(QtyAP, 0)) AS QtyAP
-        FROM dbo.Inventory
-        WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
-        GROUP BY
-          TRIM(CpnyID), TRIM(BrandDescr), TRIM(SubBrandDescr),
-          TRIM(VersionDescr), ModelYr, TRIM(Color)
-      )
+    // Obtener ventas desde Intranet
+    const ventasResult = await poolIntranet.request().query(`
       SELECT
-        TRIM(v.[${cpnyCol}])      AS CpnyId,
-        TRIM(v.[${marcaCol}])     AS Marca,
-        TRIM(v.[${subMarcaCol}])  AS SubMarca,
-        TRIM(v.[${versionCol}])   AS Version,
-        v.[${anioCol}]            AS Anio,
-        TRIM(v.[${colorCol}])     AS Color,
-        ISNULL(v.Periodo_Menos_3, 0) AS Periodo_Menos_3,
-        ISNULL(v.Periodo_Menos_2, 0) AS Periodo_Menos_2,
-        ISNULL(v.Periodo_Menos_1, 0) AS Periodo_Menos_1,
-        ISNULL(v.Periodo_Actual,  0) AS Periodo_Actual,
-        ISNULL(inv.QtyAF, 0)                         AS QtyAF,
-        ISNULL(inv.QtyAP, 0)                         AS QtyAP,
-        ISNULL(inv.QtyAF, 0) + ISNULL(inv.QtyAP, 0) AS Inventario
-      FROM dbo.vw_VentasUltimos4Periodos v
-      LEFT JOIN InvAgrupado inv
-        ON  inv.CpnyId   = TRIM(v.[${cpnyCol}])
-        AND inv.SubMarca = TRIM(v.[${subMarcaCol}])
-        AND inv.Version  = TRIM(v.[${versionCol}])
-        AND inv.Color    = TRIM(v.[${colorCol}])
-        AND inv.Anio     = v.[${anioCol}]
-      ORDER BY v.[${subMarcaCol}], v.[${versionCol}], v.[${anioCol}], v.[${colorCol}]
+        TRIM([${cpnyCol}])      AS CpnyId,
+        TRIM([${marcaCol}])     AS Marca,
+        TRIM([${subMarcaCol}])  AS SubMarca,
+        TRIM([${versionCol}])   AS Version,
+        [${anioCol}]            AS Anio,
+        TRIM([${colorCol}])     AS Color,
+        ISNULL(Periodo_Menos_3, 0) AS Periodo_Menos_3,
+        ISNULL(Periodo_Menos_2, 0) AS Periodo_Menos_2,
+        ISNULL(Periodo_Menos_1, 0) AS Periodo_Menos_1,
+        ISNULL(Periodo_Actual,  0) AS Periodo_Actual
+      FROM dbo.vw_VentasUltimos4Periodos
+      ORDER BY [${subMarcaCol}], [${versionCol}], [${anioCol}], [${colorCol}]
     `);
 
-    return (result.recordset as Record<string, unknown>[]).map(normalizeRow);
+    // Pool para inventario (BSC)
+    const poolBSC = await sql.connect(configBSC);
+    const invResult = await poolBSC.request().query(`
+      SELECT
+        TRIM(CpnyID)        AS CpnyId,
+        TRIM(SubBrandDescr) AS SubMarca,
+        TRIM(VersionDescr)  AS Version,
+        ModelYr             AS Anio,
+        TRIM(Color)         AS Color,
+        SUM(ISNULL(QtyAF, 0)) AS QtyAF,
+        SUM(ISNULL(QtyAP, 0)) AS QtyAP
+      FROM dbo.Inventory
+      WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
+      GROUP BY
+        TRIM(CpnyID), TRIM(SubBrandDescr),
+        TRIM(VersionDescr), ModelYr, TRIM(Color)
+    `);
+
+    // Hacer el JOIN en memoria
+    type InvRow = { CpnyId: string; SubMarca: string; Version: string; Anio: number; Color: string; QtyAF: number; QtyAP: number };
+    const invMap = new Map<string, InvRow>();
+    for (const inv of invResult.recordset as InvRow[]) {
+      const key = `${inv.CpnyId}|${inv.SubMarca}|${inv.Version}|${inv.Anio}|${inv.Color}`.toLowerCase();
+      invMap.set(key, inv);
+    }
+
+    const merged = (ventasResult.recordset as Record<string, unknown>[]).map(v => {
+      const key = `${String(v['CpnyId']??'').trim()}|${String(v['SubMarca']??'').trim()}|${String(v['Version']??'').trim()}|${Number(v['Anio']??0)}|${String(v['Color']??'').trim()}`.toLowerCase();
+      const inv = invMap.get(key);
+      return {
+        ...v,
+        QtyAF:      inv?.QtyAF ?? 0,
+        QtyAP:      inv?.QtyAP ?? 0,
+        Inventario: (inv?.QtyAF ?? 0) + (inv?.QtyAP ?? 0),
+      };
+    });
+
+    return merged.map(normalizeRow);
   } catch (err) {
     console.error('Error al consultar Yakimura:', err);
     throw err;
