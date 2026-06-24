@@ -99,23 +99,25 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       ORDER BY [${subMarcaCol}], [${versionCol}], [${anioCol}], [${colorCol}]
     `);
 
-    // Inventario desde BSC: agrupado por CpnyId + SubMarca + Anio
+    // Inventario desde BSC: agrupado por CpnyId + BrandDescr (Marca) + Anio
+    // La vista de ventas usa SubMarca = nombre de marca (ej. "MG"), pero en Inventory
+    // el campo equivalente es BrandDescr, no SubBrandDescr (que es el modelo)
     const invResult = await poolBSC.request().query(`
       SELECT
-        LTRIM(RTRIM(CpnyID))        AS CpnyId,
-        LTRIM(RTRIM(SubBrandDescr)) AS SubMarca,
-        ModelYr                     AS Anio,
-        SUM(ISNULL(QtyAF, 0))       AS QtyAF,
-        SUM(ISNULL(QtyAP, 0))       AS QtyAP
+        LTRIM(RTRIM(CpnyID))       AS CpnyId,
+        LTRIM(RTRIM(BrandDescr))   AS SubMarca,
+        ModelYr                    AS Anio,
+        SUM(ISNULL(QtyAF, 0))      AS QtyAF,
+        SUM(ISNULL(QtyAP, 0))      AS QtyAP
       FROM dbo.Inventory
       WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
       GROUP BY
         LTRIM(RTRIM(CpnyID)),
-        LTRIM(RTRIM(SubBrandDescr)),
+        LTRIM(RTRIM(BrandDescr)),
         ModelYr
     `);
 
-    // Construir mapa de inventario por CpnyId|SubMarca|Anio
+    // Construir mapa de inventario por CpnyId|SubMarca(=BrandDescr)|Anio
     type InvRow = { CpnyId: string; SubMarca: string; Anio: number; QtyAF: number; QtyAP: number };
     const invMap = new Map<string, InvRow>();
     for (const inv of invResult.recordset as InvRow[]) {
@@ -123,7 +125,7 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       invMap.set(key, inv);
     }
 
-    // Registrar que clave ya recibio su inventario (solo asignar en la primera fila del grupo)
+    // Solo asignar inventario en la primera fila del grupo CpnyId|SubMarca|Anio
     const keyUsed = new Set<string>();
 
     const ventasRows = ventasResult.recordset as Record<string, unknown>[];
@@ -131,7 +133,6 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       const key = `${String(v['CpnyId']??'').trim()}|${String(v['SubMarca']??'').trim()}|${Number(v['Anio']??0)}`.toLowerCase();
       const inv = invMap.get(key);
       if (inv && !keyUsed.has(key)) {
-        // Primera aparicion de esta clave: asignar inventario completo
         keyUsed.add(key);
         return {
           ...v,
@@ -140,7 +141,6 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
           Inventario: inv.QtyAF + inv.QtyAP,
         };
       }
-      // Filas subsecuentes del mismo grupo: inventario 0 para evitar duplicacion
       return {
         ...v,
         QtyAF:      0,
