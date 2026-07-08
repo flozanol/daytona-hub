@@ -4,118 +4,93 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search, Database, TrendingUp, Filter, Clock,
   BadgeDollarSign, Car, BarChart3, ShieldAlert,
-  Download, Calendar, Skull, FileSpreadsheet, AlertTriangle, Coins
+  Download, Calendar, Skull, FileSpreadsheet, AlertTriangle, Coins,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import * as XLSX from 'xlsx';
+import { TASA_ANUAL, CPNY_MAP, getCpnyNombre } from '../../lib/constants';
 
-// --- CONFIGURACIÓN FINANCIERA ---
-const TIIE = 7.02;
-const PUNTOS_ADICIONALES = 2;
-const TASA_ANUAL = (TIIE + PUNTOS_ADICIONALES) / 100; // 0.0902
-
-const CPNY_MAP: Record<string, string> = {
-  'AS25': 'Acura Interlomas',
-  'ACUI': 'Acura Interlomas',
-  'TEC': 'Motos Tecamachalco',
-  'IZT': 'Motos Iztapalapa',
-  'SAT': 'Motos Satélite',
-  'ECA': 'Motos Ecatepec',
-  'CUE': 'Motos Cuernavaca',
-  'CUU': 'Motos Cuautla',
-  '001': 'KIA Interlomas',
-  '002': 'KIA Iztapalapa',
-  'MGINT': 'MG Interlomas',
-  'MGSFE': 'MG Santa Fe',
-  'MGIZT': 'MG Iztapalapa',
-  'MGCUA': 'MG Cuajimalpa',
-  'GWCUE': 'GWM Cuernavaca',
-  'GWIZT': 'GWM Iztapalapa',
-  'CUA': 'Honda Cuajimalpa',
-  'INT': 'Honda Interlomas'
-};
-
-const fmtMoney = (v: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(v);
+const fmtMoney = (v: number) =>
+  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(v);
 
 export default function ClinicaSeminuevosSQL() {
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [data, setData]                     = useState<Record<string, unknown>[]>([]);
+  const [loading, setLoading]               = useState(true);
+  const [searchTerm, setSearchTerm]         = useState('');
   const [selectedAgencias, setSelectedAgencias] = useState<string[]>([]);
 
   useEffect(() => {
     fetch('/api/seminuevos')
       .then(res => res.json())
-      .then(sqlData => {
+      .then((sqlData: Record<string, unknown>[]) => {
         if (Array.isArray(sqlData)) {
-          const mapeado = sqlData.map((row: any) => {
-            const costo = Number(row.Costo) || 0;
-            const dias = Number(row.Antiguedad) || 0;
-            const costoFinancieroAcumulado = (costo * TASA_ANUAL / 360) * dias;
-
+          const mapeado = sqlData.map(row => {
+            const costo = Number(row['Costo']) || 0;
+            const dias  = Number(row['Antiguedad']) || 0;
+            const costoFinanciero = (costo * TASA_ANUAL / 360) * dias;
             return {
               ...row,
-              Sucursal: CPNY_MAP[row.CpnyID] || row.Ubicacion || row.CpnyID,
-              Costo: costo,
-              Días: dias,
-              CostoFinanciero: costoFinancieroAcumulado,
-              InversionTotal: costo + costoFinancieroAcumulado,
-              Margen: (Number(row.PrecioVenta) || 0) - costo
+              Sucursal: getCpnyNombre(String(row['CpnyID'] ?? '')),
+              Costo:  costo,
+              Días:   dias,
+              CostoFinanciero: costoFinanciero,
+              InversionTotal: costo + costoFinanciero,
+              Margen: (Number(row['PrecioVenta']) || 0) - costo,
             };
           });
           setData(mapeado);
         }
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, []);
 
-  const sucursalesOrdenadas = useMemo(() => {
-    const unicas = Array.from(new Set(Object.values(CPNY_MAP)));
-    return unicas.sort((a, b) => a.localeCompare(b));
-  }, []);
+  const sucursalesOrdenadas = useMemo(() =>
+    Array.from(new Set(Object.values(CPNY_MAP).map(v => v.nombre))).sort(),
+    []
+  );
 
   const filteredData = useMemo(() => {
-    let current = [...data];
-    if (selectedAgencias.length > 0) current = current.filter(d => selectedAgencias.includes(d.Sucursal));
+    let curr = [...data];
+    if (selectedAgencias.length > 0) curr = curr.filter(d => selectedAgencias.includes(d['Sucursal'] as string));
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
-      current = current.filter(d =>
-        d.Marca?.toLowerCase().includes(s) ||
-        d.Modelo?.toLowerCase().includes(s) ||
-        d.VIN?.toLowerCase().includes(s)
+      curr = curr.filter(d =>
+        String(d['Marca'] ?? '').toLowerCase().includes(s) ||
+        String(d['Modelo'] ?? '').toLowerCase().includes(s) ||
+        String(d['VIN'] ?? '').toLowerCase().includes(s)
       );
     }
-    return current.sort((a, b) => b.Días - a.Días);
+    return curr.sort((a, b) => (b['Días'] as number) - (a['Días'] as number));
   }, [data, selectedAgencias, searchTerm]);
 
   const stats = useMemo(() => {
-    const totalCosto = filteredData.reduce((acc, curr) => acc + curr.Costo, 0);
-    const costHueso = filteredData.filter(d => d.Días > 90).reduce((acc, curr) => acc + curr.Costo, 0);
-    const totalFinanciero = filteredData.reduce((acc, curr) => acc + curr.CostoFinanciero, 0);
-
+    const totalCosto     = filteredData.reduce((s, d) => s + (d['Costo'] as number), 0);
+    const costHueso      = filteredData.filter(d => (d['Días'] as number) > 90).reduce((s, d) => s + (d['Costo'] as number), 0);
+    const totalFinanciero= filteredData.reduce((s, d) => s + (d['CostoFinanciero'] as number), 0);
     return {
-      unidades: filteredData.length,
-      costo: totalCosto,
-      riesgo: costHueso,
-      financiero: totalFinanciero,
-      pctRiesgo: (costHueso / (totalCosto || 1)) * 100,
-      diasPromedio: Math.round(filteredData.reduce((acc, curr) => acc + curr.Días, 0) / (filteredData.length || 1))
+      unidades:     filteredData.length,
+      costo:        totalCosto,
+      riesgo:       costHueso,
+      financiero:   totalFinanciero,
+      diasPromedio: Math.round(filteredData.reduce((s, d) => s + (d['Días'] as number), 0) / (filteredData.length || 1)),
     };
   }, [filteredData]);
 
   const donutData = useMemo(() => [
-    { name: 'Sano (0-30)', value: filteredData.filter(d => d.Días <= 30).length, color: '#10b981' },
-    { name: 'Precaución (31-60)', value: filteredData.filter(d => d.Días > 30 && d.Días <= 60).length, color: '#f59e0b' },
-    { name: 'Alerta (61-90)', value: filteredData.filter(d => d.Días > 60 && d.Días <= 90).length, color: '#f97316' },
-    { name: 'Tóxico (>90)', value: filteredData.filter(d => d.Días > 90).length, color: '#fd0019' }
+    { name: 'Sano (0-30)',        value: filteredData.filter(d => (d['Días'] as number) <= 30).length,                                       color: '#10b981' },
+    { name: 'Precaución (31-60)', value: filteredData.filter(d => (d['Días'] as number) > 30 && (d['Días'] as number) <= 60).length,         color: '#f59e0b' },
+    { name: 'Alerta (61-90)',     value: filteredData.filter(d => (d['Días'] as number) > 60 && (d['Días'] as number) <= 90).length,         color: '#f97316' },
+    { name: 'Tóxico (>90)',       value: filteredData.filter(d => (d['Días'] as number) > 90).length,                                        color: '#fd0019' },
   ], [filteredData]);
 
   const marcasToxicas = useMemo(() => {
-    const counts: Record<string, { uds: number, monto: number }> = {};
-    filteredData.filter(d => d.Días > 90).forEach(d => {
-      if (!counts[d.Marca]) counts[d.Marca] = { uds: 0, monto: 0 };
-      counts[d.Marca].uds++;
-      counts[d.Marca].monto += d.Costo;
+    const counts: Record<string, { uds: number; monto: number }> = {};
+    filteredData.filter(d => (d['Días'] as number) > 90).forEach(d => {
+      const key = String(d['Marca'] ?? 'Sin marca');
+      if (!counts[key]) counts[key] = { uds: 0, monto: 0 };
+      counts[key].uds++;
+      counts[key].monto += d['Costo'] as number;
     });
     return Object.entries(counts)
       .map(([name, val]) => ({ name, ...val }))
@@ -124,15 +99,13 @@ export default function ClinicaSeminuevosSQL() {
   }, [filteredData]);
 
   const radiografia = useMemo(() => {
-    const sucs: Record<string, any> = {};
+    const sucs: Record<string, { name: string; total: number; sano: number; hueso: number; montoHueso: number }> = {};
     filteredData.forEach(d => {
-      if (!sucs[d.Sucursal]) sucs[d.Sucursal] = { name: d.Sucursal, total: 0, sano: 0, hueso: 0, montoHueso: 0 };
-      sucs[d.Sucursal].total++;
-      if (d.Días <= 30) sucs[d.Sucursal].sano++;
-      if (d.Días > 90) {
-        sucs[d.Sucursal].hueso++;
-        sucs[d.Sucursal].montoHueso += d.Costo;
-      }
+      const suc = d['Sucursal'] as string;
+      if (!sucs[suc]) sucs[suc] = { name: suc, total: 0, sano: 0, hueso: 0, montoHueso: 0 };
+      sucs[suc].total++;
+      if ((d['Días'] as number) <= 30) sucs[suc].sano++;
+      if ((d['Días'] as number) > 90) { sucs[suc].hueso++; sucs[suc].montoHueso += d['Costo'] as number; }
     });
     return Object.values(sucs).sort((a, b) => (b.hueso / b.total) - (a.hueso / a.total));
   }, [filteredData]);
@@ -144,19 +117,26 @@ export default function ClinicaSeminuevosSQL() {
     return 'bg-red-100 text-red-700 border-red-200';
   };
 
-  const exportToExcel = (rows: any[], filename: string) => {
+  const exportToExcel = (rows: Record<string, unknown>[], filename: string) => {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Data");
+    XLSX.utils.book_append_sheet(wb, ws, 'Data');
     XLSX.writeFile(wb, `${filename}.xlsx`);
   };
 
-  if (loading) return <div className="p-20 text-center font-black animate-pulse text-[#003366]">SINCRONIZANDO AUDITORÍA...</div>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-24 text-gray-400">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003366] mb-4" />
+        <p className="text-sm font-bold tracking-widest uppercase">Sincronizando auditoría...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-slate-50 p-6 md:p-8 font-sans space-y-8">
 
-      {/* HEADER & MULTI-FILTRO */}
+      {/* HEADER + FILTROS */}
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-6">
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
@@ -166,8 +146,12 @@ export default function ClinicaSeminuevosSQL() {
             {sucursalesOrdenadas.map(suc => (
               <button
                 key={suc}
-                onClick={() => setSelectedAgencias(prev => prev.includes(suc) ? prev.filter(s => s !== suc) : [...prev, suc])}
-                className={`px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all ${selectedAgencias.includes(suc) ? 'bg-slate-900 text-white border-black shadow-md' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-400'}`}
+                onClick={() => setSelectedAgencias(p => p.includes(suc) ? p.filter(s => s !== suc) : [...p, suc])}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all ${
+                  selectedAgencias.includes(suc)
+                    ? 'bg-slate-900 text-white border-black shadow-md'
+                    : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-400'
+                }`}
               >
                 {suc}
               </button>
@@ -175,17 +159,17 @@ export default function ClinicaSeminuevosSQL() {
           </div>
         </div>
 
-        {/* KPIs SUPERIORES */}
+        {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <KPICard title="Unidades" value={stats.unidades} icon={<Car />} color="text-slate-800" />
-          <KPICard title="Inversión Unidades" value={fmtMoney(stats.costo)} icon={<Database />} color="text-[#003366]" />
-          <KPICard title="Capital en Riesgo" value={fmtMoney(stats.riesgo)} icon={<AlertTriangle />} color="text-[#fd0019]" subtitle="+90 Días" />
-          <KPICard title="Costo Fin. Total" value={fmtMoney(stats.financiero)} icon={<Coins />} color="text-amber-600" subtitle={`Tasa: ${(TASA_ANUAL * 100).toFixed(2)}%`} />
-          <KPICard title="Promedio Días" value={`${stats.diasPromedio} d`} icon={<Calendar />} color="text-slate-800" />
+          <KPICard title="Unidades"       value={stats.unidades}               icon={<Car />}         color="text-slate-800" />
+          <KPICard title="Inversión"       value={fmtMoney(stats.costo)}       icon={<Database />}    color="text-[#003366]" />
+          <KPICard title="Capital Riesgo"  value={fmtMoney(stats.riesgo)}      icon={<AlertTriangle />} color="text-[#fd0019]" subtitle="+90 Días" />
+          <KPICard title="Costo Fin."      value={fmtMoney(stats.financiero)}   icon={<Coins />}       color="text-amber-600" subtitle={`Tasa: ${(TASA_ANUAL * 100).toFixed(2)}%`} />
+          <KPICard title="Promedio Días"   value={`${stats.diasPromedio} d`}   icon={<Calendar />}    color="text-slate-800" />
         </div>
       </div>
 
-      {/* FILA 1: GRÁFICAS */}
+      {/* GRÁFICAS */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 lg:col-span-1">
           <h2 className="text-xs font-black uppercase mb-6 border-b pb-2 tracking-widest">Semáforo Rotación</h2>
@@ -202,7 +186,10 @@ export default function ClinicaSeminuevosSQL() {
           <div className="space-y-2">
             {donutData.map(d => (
               <div key={d.name} className="flex justify-between text-[10px] font-bold uppercase">
-                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }}></span>{d.name}</span>
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
+                  {d.name}
+                </span>
                 <span>{d.value} ud.</span>
               </div>
             ))}
@@ -232,15 +219,13 @@ export default function ClinicaSeminuevosSQL() {
             <h2 className="text-xs font-black uppercase tracking-widest">Radiografía por Sucursal</h2>
             <span className="text-[9px] font-black text-slate-400 uppercase">Inventario &gt;90 Días</span>
           </div>
-          <div className="overflow-auto flex-1 scrollbar-thin">
+          <div className="overflow-auto flex-1">
             <table className="w-full text-left text-[10px]">
               <thead className="bg-slate-900 text-white sticky top-0 font-black uppercase">
                 <tr>
-                  <th className="p-3">Sucursal</th>
-                  <th className="p-3 text-center">Unidades</th>
-                  <th className="p-3 text-center text-green-400">Sano</th>
-                  <th className="p-3 text-center text-red-500">Hueso</th>
-                  <th className="p-3 text-right">Cost. Congelado</th>
+                  {['Sucursal','Unidades','Sano','Hueso','Cost. Congelado'].map(h => (
+                    <th key={h} className="p-3">{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -265,31 +250,31 @@ export default function ClinicaSeminuevosSQL() {
           <h2 className="text-white font-black text-sm uppercase flex items-center gap-2">
             <Skull className="text-red-500" size={18} /> Muro de los Lamentos (Pérdida Financiera)
           </h2>
-          <button onClick={() => exportToExcel(filteredData.filter(d => d.Días > 90), 'Huesos_Financiero')} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-2">
+          <button
+            onClick={() => exportToExcel(filteredData.filter(d => (d['Días'] as number) > 90), 'Huesos_Financiero')}
+            className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-2"
+          >
             <FileSpreadsheet size={14} /> Exportar Huesos
           </button>
         </div>
-        <div className="overflow-auto max-h-80 scrollbar-thin">
+        <div className="overflow-auto max-h-80">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 font-black uppercase text-[10px] text-slate-500 border-b">
               <tr>
-                <th className="p-3 text-center">Días</th>
-                <th className="p-3">Vehículo</th>
-                <th className="p-3">Sucursal</th>
-                <th className="p-3 text-right">Costo Auto</th>
-                <th className="p-3 text-right">Costo Financiero</th>
-                <th className="p-3 text-right bg-red-50 text-red-700 font-black">Inversión Total</th>
+                {['Días','Vehículo','Sucursal','Costo Auto','Costo Financiero','Inversión Total'].map(h => (
+                  <th key={h} className="p-3">{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredData.filter(d => d.Días > 90).map((auto, i) => (
+              {filteredData.filter(d => (d['Días'] as number) > 90).map((auto, i) => (
                 <tr key={i} className="hover:bg-red-50 transition-colors font-bold text-[11px]">
-                  <td className="p-3 text-center"><span className="bg-red-600 text-white px-2 py-1 rounded-md">{auto.Días}</span></td>
-                  <td className="p-3 text-slate-900">{auto.Anio} {auto.Marca} {auto.Modelo}</td>
-                  <td className="p-3 uppercase text-slate-500">{auto.Sucursal}</td>
-                  <td className="p-3 text-right text-slate-400">{fmtMoney(auto.Costo)}</td>
-                  <td className="p-3 text-right text-amber-600">{fmtMoney(auto.CostoFinanciero)}</td>
-                  <td className="p-3 text-right text-red-600 font-black">{fmtMoney(auto.InversionTotal)}</td>
+                  <td className="p-3 text-center"><span className="bg-red-600 text-white px-2 py-1 rounded-md">{String(auto['Días'])}</span></td>
+                  <td className="p-3 text-slate-900">{String(auto['Anio'])} {String(auto['Marca'])} {String(auto['Modelo'])}</td>
+                  <td className="p-3 uppercase text-slate-500">{String(auto['Sucursal'])}</td>
+                  <td className="p-3 text-right text-slate-400">{fmtMoney(auto['Costo'] as number)}</td>
+                  <td className="p-3 text-right text-amber-600">{fmtMoney(auto['CostoFinanciero'] as number)}</td>
+                  <td className="p-3 text-right text-red-600 font-black">{fmtMoney(auto['InversionTotal'] as number)}</td>
                 </tr>
               ))}
             </tbody>
@@ -297,48 +282,49 @@ export default function ClinicaSeminuevosSQL() {
         </div>
       </div>
 
-      {/* INVENTARIO COMPLETO (Actualizado con Desglose Financiero) */}
+      {/* INVENTARIO COMPLETO */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
           <h2 className="text-slate-900 font-black text-lg">Inventario Total</h2>
           <div className="flex gap-3 w-full md:w-auto">
             <input
-              type="text" placeholder="Buscar modelo, VIN..."
-              value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+              type="text"
+              placeholder="Buscar modelo, VIN..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
               className="bg-slate-50 pl-4 pr-4 py-2 rounded-xl text-xs font-bold outline-none border border-slate-200 shadow-inner"
             />
-            <button onClick={() => exportToExcel(filteredData, 'Inventario_Completo')} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow-md">
+            <button
+              onClick={() => exportToExcel(filteredData, 'Inventario_Completo')}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow-md"
+            >
               Exportar Todo
             </button>
           </div>
         </div>
-        <div className="overflow-auto max-h-[500px] scrollbar-thin">
+        <div className="overflow-auto max-h-[500px]">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-100 sticky top-0 font-black uppercase text-[10px] text-slate-500 border-b z-10">
               <tr>
-                <th className="p-3">Sucursal</th>
-                <th className="p-3">Vehículo</th>
-                <th className="p-3">VIN</th>
-                <th className="p-3 text-center">Días</th>
-                <th className="p-3 text-right">Costo</th>
-                <th className="p-3 text-right text-amber-600">Costo Fin.</th>
-                <th className="p-3 text-right font-black">Inversión Total</th>
+                {['Sucursal','Vehículo','VIN','Días','Costo','Costo Fin.','Inversión Total'].map(h => (
+                  <th key={h} className="p-3">{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredData.map((row, idx) => (
                 <tr key={idx} className="hover:bg-slate-50 font-medium transition-colors">
-                  <td className="p-3 font-bold text-slate-600">{row.Sucursal}</td>
-                  <td className="p-3 font-black text-slate-900">{row.Anio} {row.Marca} {row.Modelo}</td>
-                  <td className="p-3 font-mono text-[9px] text-slate-400">{row.VIN}</td>
+                  <td className="p-3 font-bold text-slate-600">{String(row['Sucursal'])}</td>
+                  <td className="p-3 font-black text-slate-900">{String(row['Anio'])} {String(row['Marca'])} {String(row['Modelo'])}</td>
+                  <td className="p-3 font-mono text-[9px] text-slate-400">{String(row['VIN'] ?? '')}</td>
                   <td className="p-3 text-center">
-                    <span className={`px-3 py-1 rounded-full border font-black text-[10px] ${getAgeColor(row.Días)}`}>
-                      {row.Días} días
+                    <span className={`px-3 py-1 rounded-full border font-black text-[10px] ${getAgeColor(row['Días'] as number)}`}>
+                      {String(row['Días'])} días
                     </span>
                   </td>
-                  <td className="p-3 text-right text-slate-500">{fmtMoney(row.Costo)}</td>
-                  <td className="p-3 text-right text-amber-600">{fmtMoney(row.CostoFinanciero)}</td>
-                  <td className="p-3 text-right font-black text-slate-900 bg-slate-50/50">{fmtMoney(row.InversionTotal)}</td>
+                  <td className="p-3 text-right text-slate-500">{fmtMoney(row['Costo'] as number)}</td>
+                  <td className="p-3 text-right text-amber-600">{fmtMoney(row['CostoFinanciero'] as number)}</td>
+                  <td className="p-3 text-right font-black text-slate-900 bg-slate-50/50">{fmtMoney(row['InversionTotal'] as number)}</td>
                 </tr>
               ))}
             </tbody>
@@ -349,7 +335,13 @@ export default function ClinicaSeminuevosSQL() {
   );
 }
 
-function KPICard({ title, value, icon, color, subtitle }: any) {
+function KPICard({ title, value, icon, color, subtitle }: {
+  title: string;
+  value: string | number;
+  icon: React.ReactNode;
+  color: string;
+  subtitle?: string;
+}) {
   return (
     <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 relative overflow-hidden group">
       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{title}</p>
