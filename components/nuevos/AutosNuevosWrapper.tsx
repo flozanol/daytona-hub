@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import ClinicaInventarioFinalV4 from './ClinicaInventarioFinalV4';
 
-const DASHBOARD_URL = 'https://flozanol.github.io/daytona-autos-nuevos-kpis/';
+interface AutosNuevosWrapperProps {
+  dashboardUrl: string;
+}
 
-export function AutosNuevosWrapper() {
+export function AutosNuevosWrapper({ dashboardUrl }: AutosNuevosWrapperProps) {
   const [subTab, setSubTab] = useState<'dashboard' | 'clinica'>('dashboard');
 
   return (
@@ -36,7 +38,7 @@ export function AutosNuevosWrapper() {
               </p>
             </div>
             <iframe
-              src={DASHBOARD_URL}
+              src={dashboardUrl}
               title="Dashboard Autos Nuevos"
               className="w-full h-full border-0 absolute inset-0 z-10 bg-transparent"
               allowFullScreen
