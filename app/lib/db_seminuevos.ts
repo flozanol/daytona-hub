@@ -1,18 +1,8 @@
 import sql from 'mssql';
-
-const config: sql.config = {
-  user:     process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server:   process.env.DB_SERVER ?? '',
-  database: process.env.DB_NAME,
-  port:     parseInt(process.env.DB_PORT ?? '1433'),
-  options:  { encrypt: true, trustServerCertificate: true },
-  connectionTimeout: 30_000,
-  requestTimeout:    30_000,
-};
+import { makeConfig } from './db-connection';
 
 export async function getSeminuevos() {
-  const pool = new sql.ConnectionPool(config);
+  const pool = new sql.ConnectionPool(makeConfig(process.env.DB_NAME ?? 'BSC'));
   try {
     await pool.connect();
     const result = await pool.request().query(`
