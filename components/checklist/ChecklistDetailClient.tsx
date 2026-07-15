@@ -233,14 +233,16 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
     );
   }
 
-  const vehicle  = [checklist.Marca, checklist.SubMarca, checklist.Version].filter(Boolean).join(' ');
-  const bueno    = items.filter(i => i.Resultado === true).length;
-  const malo     = items.filter(i => i.Resultado === false).length;
-  const sinEval  = items.filter(i => i.Resultado === null).length;
-  const total    = items.length;
-  const evaluated = bueno + malo;
-  const allDone  = total > 0 && sinEval === 0;
-  const progress = total > 0 ? (evaluated / total) * 100 : 0;
+  const vehicle    = [checklist.Marca, checklist.SubMarca, checklist.Version].filter(Boolean).join(' ');
+  const bueno      = items.filter(i => i.Resultado === true).length;
+  const malo       = items.filter(i => i.Resultado === false).length;
+  const sinEval    = items.filter(i => i.Resultado === null).length;
+  const total      = items.length;
+  const evaluated  = bueno + malo;
+  const allDone    = total > 0 && sinEval === 0;
+  const progress   = total > 0 ? (evaluated / total) * 100 : 0;
+  // Edición permitida solo si es admin Y el checklist NO está completado
+  const isEditable = isAdmin && checklist.Status !== 2;
 
   return (
     <>
@@ -284,8 +286,8 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
             )}
           </div>
 
-          {/* Botones de status — solo desktop */}
-          {isAdmin && (
+          {/* Botones de status — solo desktop, solo si no está completado */}
+          {isAdmin && checklist.Status !== 2 && (
             <div className="hidden md:flex gap-2 flex-wrap mt-4 pt-4 border-t border-gray-100">
               <button
                 onClick={() => handleStatusChange(1)}
@@ -324,7 +326,7 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
                   <span className="text-[10px] font-bold tracking-widest uppercase text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
                     {item.Categoria}
                   </span>
-                  {isAdmin && (
+                  {isEditable && (
                     <button
                       onClick={() => setNotasItem(item)}
                       className={`p-2 rounded-xl transition-colors active:scale-95 ${
@@ -345,7 +347,7 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
 
                 {/* Botones */}
                 <div className="p-3">
-                  {isAdmin ? (
+                  {isEditable ? (
                     <div className="flex gap-2">
                       <button
                         onClick={() => !isSavingThis && handleResultado(item, item.Resultado === true ? null : true)}
@@ -422,7 +424,7 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
                   <td className="px-5 py-3 font-medium text-gray-700 text-xs uppercase tracking-wide">{item.Categoria}</td>
                   <td className="px-5 py-3 text-gray-600">{item.Descripcion}</td>
                   <td className="px-5 py-3">
-                    {isAdmin
+                    {isEditable
                       ? (
                         <ResultadoToggle
                           value={item.Resultado}
@@ -434,7 +436,7 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
                     }
                   </td>
                   <td className="px-5 py-3">
-                    {isAdmin ? (
+                    {isEditable ? (
                       <button
                         onClick={() => setNotasItem(item)}
                         title={item.Notas ?? 'Agregar nota'}
@@ -471,7 +473,7 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
           <div className="h-1 bg-gray-200">
             <div
               className="h-full bg-green-500 transition-all duration-500"
-              style={{ width: `${progress}%` }}
+              style={{ width: checklist.Status === 2 ? '100%' : `${progress}%` }}
             />
           </div>
 
@@ -487,44 +489,52 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
               <ArrowUp size={16} />
             </button>
 
-            {/* Conteo */}
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-700">
-                {evaluated} de {total} evaluados
-              </p>
-              {!allDone && sinEval > 0 && (
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  Falta{sinEval > 1 ? 'n' : ''} {sinEval} ítem{sinEval > 1 ? 's' : ''} por evaluar
-                </p>
-              )}
-              {allDone && checklist.Status !== 2 && (
-                <p className="text-[10px] text-green-600 mt-0.5 font-medium">
-                  ¡Todo evaluado! Ya puedes completar.
-                </p>
-              )}
-              {checklist.Status === 2 && (
-                <p className="text-[10px] text-green-600 mt-0.5 font-medium">
-                  Checklist completado
-                </p>
-              )}
-            </div>
+            {checklist.Status === 2 ? (
+              /* Estado completado — solo lectura */
+              <div className="flex-1 flex items-center gap-2">
+                <CheckCircle2 size={18} className="text-green-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Checklist completado</p>
+                  <p className="text-[10px] text-gray-400">{bueno} buenos · {malo} malos</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Conteo */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-700">
+                    {evaluated} de {total} evaluados
+                  </p>
+                  {sinEval > 0 && (
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      Falta{sinEval > 1 ? 'n' : ''} {sinEval} ítem{sinEval > 1 ? 's' : ''} por evaluar
+                    </p>
+                  )}
+                  {allDone && (
+                    <p className="text-[10px] text-green-600 mt-0.5 font-medium">
+                      ¡Todo evaluado! Ya puedes completar.
+                    </p>
+                  )}
+                </div>
 
-            {/* Botón Completar */}
-            <button
-              onClick={() => handleStatusChange(2)}
-              disabled={!allDone || checklist.Status === 2 || saving}
-              className={`shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all
-                ${allDone && checklist.Status !== 2
-                  ? 'bg-green-500 text-white shadow-sm active:scale-95 active:bg-green-600'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-            >
-              {saving
-                ? <Loader2 size={14} className="animate-spin" />
-                : <CheckCircle2 size={14} />
-              }
-              Completar
-            </button>
+                {/* Botón Completar */}
+                <button
+                  onClick={() => handleStatusChange(2)}
+                  disabled={!allDone || saving}
+                  className={`shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all
+                    ${allDone
+                      ? 'bg-green-500 text-white shadow-sm active:scale-95 active:bg-green-600'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                >
+                  {saving
+                    ? <Loader2 size={14} className="animate-spin" />
+                    : <CheckCircle2 size={14} />
+                  }
+                  Completar
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
