@@ -298,7 +298,7 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
               </button>
               <button
                 onClick={() => handleStatusChange(2)}
-                disabled={checklist.Status === 2 || saving}
+                disabled={saving}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-40 transition-colors"
               >
                 Marcar Completado
