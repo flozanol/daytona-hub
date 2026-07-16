@@ -2,7 +2,7 @@ import sql from 'mssql';
 import { makeConfig } from './db-connection';
 
 export async function getSeminuevos() {
-  const pool = new sql.ConnectionPool(makeConfig(process.env.DB_NAME ?? 'BSC'));
+  const pool = new sql.ConnectionPool(makeConfig('BSC'));
   try {
     await pool.connect();
     const result = await pool.request().query(`

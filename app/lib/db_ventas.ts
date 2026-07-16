@@ -58,7 +58,7 @@ function normalizeSubBrand(cpnyId: string, subBrandDescr: string): string {
 
 export async function getVentasYakimura(): Promise<VentaRow[]> {
   const poolIntranet = new sql.ConnectionPool(makeConfig('Intranet'));
-  const poolBSC      = new sql.ConnectionPool(makeConfig(process.env.DB_NAME ?? 'BSC'));
+  const poolBSC      = new sql.ConnectionPool(makeConfig('BSC'));
   try {
     await poolIntranet.connect();
     await poolBSC.connect();
