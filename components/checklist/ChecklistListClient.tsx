@@ -24,9 +24,10 @@ export function ChecklistListClient({ isAdmin }: ChecklistListClientProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/checklist?page=${p}&pageSize=20`);
-      if (!res.ok) throw new Error((await res.json()).error ?? res.statusText);
-      setResult(await res.json());
+      const res  = await fetch(`/api/checklist?page=${p}&pageSize=20`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.details ? `${json.error}: ${json.details}` : (json.error ?? res.statusText));
+      setResult(json);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar');
     } finally {
