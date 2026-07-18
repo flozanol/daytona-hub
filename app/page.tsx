@@ -1,139 +1,96 @@
-// @ts-nocheck
-'use client';
+import Link from 'next/link';
+import { Car, Key, Wrench, Megaphone, LayoutDashboard, Factory, Database, Target, ArrowRight } from 'lucide-react';
+import { MinutaBoard } from '../components/minutas/MinutaBoard';
 
-import React, { useState } from 'react';
-import { Car, Key, Wrench, Megaphone, LayoutDashboard, Database, Target, ArrowRight, Factory } from 'lucide-react';
-import MinutaBoard from '../components/MinutaBoard';
-import AutosNuevosWrapper from '../components/AutosNuevosWrapper';
-import YakimuraView from '../components/YakimuraView';
+const MODULES = [
+  {
+    href: '/nuevos',
+    label: 'Autos Nuevos',
+    Icon: Car,
+    status: 'Conectado (API Sheets + SQL Server)',
+  },
+  {
+    href: '/seminuevos',
+    label: 'Seminuevos',
+    Icon: Key,
+    status: 'Conectado (API Sheets)',
+  },
+  {
+    href: '/postventa',
+    label: 'Postventa',
+    Icon: Wrench,
+    status: 'Conectado (CSV Hub)',
+  },
+  {
+    href: '/marketing',
+    label: 'Marketing',
+    Icon: Megaphone,
+    status: 'Conectado (Supabase DB)',
+  },
+  {
+    href: '/yakimura',
+    label: 'Yakimura',
+    Icon: Factory,
+    status: 'Conectado (SQL Server)',
+  },
+] as const;
 
-export default function DaytonaHub() {
-  const [activeTab, setActiveTab] = useState('resumen');
-
-  const dashboards = [
-    { id: 'resumen', name: 'Centro de Comando', icon: LayoutDashboard },
-    { id: 'nuevos', name: 'Autos Nuevos', url: 'https://flozanol.github.io/daytona-autos-nuevos-kpis/', icon: Car, status: 'Conectado (API Sheets)' },
-    { id: 'seminuevos', name: 'Seminuevos', url: 'https://flozanol.github.io/daytona-seminuevos-kpis/', icon: Key, status: 'Conectado (API Sheets)' },
-    { id: 'postventa', name: 'Postventa', url: 'https://daytona-postventa-kpis.vercel.app/', icon: Wrench, status: 'Conectado (CSV Hub)' },
-    { id: 'marketing', name: 'Marketing', url: 'https://daytona-marketing-dashboard.vercel.app/', icon: Megaphone, status: 'Conectado (Supabase DB)' },
-    { id: 'yakimura', name: 'Yakimura', icon: Factory, status: 'Conectado (SQL Server)' },
-  ];
-
-  const activeApp = dashboards.find(d => d.id === activeTab);
-
+export default function ResumenPage() {
   return (
-    <div className="flex flex-col h-screen w-full bg-[#F4F6F8] overflow-hidden font-sans antialiased">
-
-      {/* BARRA SUPERIOR */}
-      <header className="bg-[#003366] text-white shadow-lg z-20 shrink-0">
-        <div className="flex flex-col md:flex-row justify-between items-center px-6 py-3">
-          <div className="flex items-center gap-4 mb-4 md:mb-0">
-            <img
-              src="https://grupodaytona.com/_next/image?url=https%3A%2F%2Fapi.grupodaytona.com%2Ffiles%2Fimages%2Ffull-xzLxpZqXUE-1728519042236.png&w=384&q=75"
-              alt="Daytona" className="w-32"
-            />
-            <div className="h-8 w-px bg-white/20 hidden md:block"></div>
-            <div className="hidden md:flex items-center gap-2 text-white/90">
-              <span className="font-bold tracking-widest text-sm uppercase">Business Intelligence Hub</span>
-            </div>
-          </div>
-          <nav className="flex gap-1 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 hide-scrollbar">
-            {dashboards.map((app) => {
-              const Icon = app.icon;
-              const isActive = activeTab === app.id;
-              return (
-                <button
-                  key={app.id}
-                  onClick={() => setActiveTab(app.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap
-                    ${isActive ? 'bg-white text-[#003366] shadow-md scale-105' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
-                >
-                  <Icon size={16} />
-                  {app.name}
-                </button>
-              );
-            })}
-          </nav>
+    <div className="max-w-7xl mx-auto p-6 md:p-10 animate-in fade-in duration-500">
+      {/* Hero */}
+      <div className="mb-10 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-5 text-[#003366]">
+          <LayoutDashboard size={180} />
         </div>
-      </header>
+        <div className="relative z-10">
+          <span className="bg-blue-50 text-[#003366] text-xs font-black uppercase px-3 py-1.5 rounded-full tracking-widest border border-blue-100">
+            PLATAFORMA ACTIVA: Centralización Completada
+          </span>
+          <h1 className="text-4xl font-black text-[#003366] tracking-tight mt-4">
+            Bienvenido al Portal de Inteligencia Daytona
+          </h1>
+          <p className="text-gray-600 font-medium mt-2 max-w-3xl leading-relaxed">
+            Accede a los dashboards de Nuevos, Seminuevos, Postventa, Marketing y Yakimura
+            desde el menú superior. La información se actualiza en tiempo real.
+          </p>
+        </div>
+      </div>
 
-      {/* ÁREA PRINCIPAL */}
-      <main className="flex-1 w-full relative overflow-y-auto bg-gray-50">
-
-        {activeTab === 'resumen' && (
-          <div className="max-w-7xl mx-auto p-6 md:p-10 animate-in fade-in duration-500">
-            <div className="mb-10 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-5 text-[#003366]"><LayoutDashboard size={180} /></div>
-              <div className="relative z-10">
-                <span className="bg-blue-50 text-[#003366] text-xs font-black uppercase px-3 py-1.5 rounded-full tracking-widest border border-blue-100">
-                  PLATAFORMA ACTIVA: Centralización Completada
-                </span>
-                <h1 className="text-4xl font-black text-[#003366] tracking-tight mt-4">Bienvenido al Portal de Inteligencia Daytona</h1>
-                <p className="text-gray-600 font-medium mt-2 max-w-3xl leading-relaxed">
-                  Hemos unificado el acceso a todos los módulos de datos del Grupo. Desde este panel superior, puede navegar instantáneamente entre los dashboards de Nuevos, Seminuevos, Postventa y Marketing, visualizando la información en vivo de cada área.
-                </p>
+      {/* Módulos */}
+      <div className="mb-10">
+        <h2 className="text-sm font-black text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+          <Target size={18} className="text-[#fd0019]" />
+          Acceso Instantáneo a Datos Reales
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          {MODULES.map(({ href, label, Icon, status }) => (
+            <Link
+              key={href}
+              href={href}
+              className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-100 transition-all cursor-pointer group"
+            >
+              <div className="flex justify-between items-start mb-5">
+                <div className="bg-blue-50 p-3 rounded-xl text-[#003366]">
+                  <Icon size={22} />
+                </div>
+                <ArrowRight size={20} className="text-gray-300 group-hover:text-[#fd0019] transition-colors" />
               </div>
-            </div>
-            <div className="mb-10">
-              <h2 className="text-sm font-black text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <Target size={18} className="text-[#fd0019]" /> Acceso Instantáneo a Datos Reales
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {dashboards.filter(d => d.id !== 'resumen').map(app => {
-                  const Icon = app.icon;
-                  return (
-                    <div
-                      key={app.id}
-                      className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-100 transition-all cursor-pointer group"
-                      onClick={() => setActiveTab(app.id)}
-                    >
-                      <div className="flex justify-between items-start mb-5">
-                        <div className="bg-blue-50 p-3 rounded-xl text-[#003366]"><Icon size={22} /></div>
-                        <ArrowRight size={20} className="text-gray-300 group-hover:text-[#fd0019] transition-colors" />
-                      </div>
-                      <h3 className="text-lg font-black text-gray-900 tracking-tight">{app.name}</h3>
-                      <p className="text-xs font-bold text-emerald-600 mt-1.5 flex items-center gap-1.5">
-                        <Database size={12} /> {app.status}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-3 font-medium">Haga clic para ver el desglose detallado e interactivo.</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <MinutaBoard />
-          </div>
-        )}
+              <h3 className="text-lg font-black text-gray-900 tracking-tight">{label}</h3>
+              <p className="text-xs font-bold text-emerald-600 mt-1.5 flex items-center gap-1.5">
+                <Database size={12} />
+                {status}
+              </p>
+              <p className="text-sm text-gray-500 mt-3 font-medium">
+                Haga clic para ver el desglose detallado.
+              </p>
+            </Link>
+          ))}
+        </div>
+      </div>
 
-        {activeTab === 'yakimura' && <YakimuraView />}
-
-        {activeTab === 'nuevos' && <AutosNuevosWrapper activeApp={activeApp} />}
-
-        {activeTab === 'seminuevos' && (
-          <div className="p-6 w-full">
-            <div className="flex flex-col h-[85vh] w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-              <iframe src="https://flozanol.github.io/daytona-seminuevos-kpis/" className="w-full h-full border-none" />
-            </div>
-          </div>
-        )}
-
-        {activeTab !== 'resumen' && activeTab !== 'yakimura' && activeTab !== 'nuevos' && activeTab !== 'seminuevos' && (
-          <>
-            <div className="absolute inset-0 flex flex-col items-center justify-center -z-10 bg-gray-50">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003366] mb-4"></div>
-              <p className="text-[#003366] font-bold text-sm tracking-widest uppercase">Cargando Módulo {activeApp?.name}...</p>
-            </div>
-            {activeApp?.url && (
-              <iframe
-                src={activeApp.url}
-                title={activeApp.name}
-                className="w-full h-full border-0 absolute inset-0 z-10 bg-transparent"
-                allowFullScreen
-              />
-            )}
-          </>
-        )}
-      </main>
+      {/* Minutas */}
+      <MinutaBoard />
     </div>
   );
 }

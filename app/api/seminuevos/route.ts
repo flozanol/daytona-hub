@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getSeminuevos } from '../../lib/db_seminuevos';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
-    try {
-        const data = await getSeminuevos();
-        return NextResponse.json(data);
-    } catch (error: any) {
-        // CAMBIO: Ahora nos devolverá el error real para saber qué columna corregir
-        return NextResponse.json({ 
-            error: 'Error en SQL', 
-            details: error.message 
-        }, { status: 500 });
-    }
+  try {
+    const data = await getSeminuevos();
+    return NextResponse.json(data);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: 'Error en SQL', details: msg }, { status: 500 });
+  }
 }

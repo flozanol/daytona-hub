@@ -1,26 +1,5 @@
 import sql from 'mssql';
-
-const configBSC: sql.config = {
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER || '',
-  database: process.env.DB_NAME || 'BSC',
-  port: parseInt(process.env.DB_PORT || '1433'),
-  options: { encrypt: true, trustServerCertificate: true },
-  connectionTimeout: 30000,
-  requestTimeout: 30000,
-};
-
-const configIntranet: sql.config = {
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER || '',
-  database: 'Intranet',
-  port: parseInt(process.env.DB_PORT || '1433'),
-  options: { encrypt: true, trustServerCertificate: true },
-  connectionTimeout: 30000,
-  requestTimeout: 30000,
-};
+import { makeConfig } from './db-connection';
 
 export interface VentaRow {
   CpnyId: string;
@@ -78,8 +57,8 @@ function normalizeSubBrand(cpnyId: string, subBrandDescr: string): string {
 }
 
 export async function getVentasYakimura(): Promise<VentaRow[]> {
-  const poolIntranet = new sql.ConnectionPool(configIntranet);
-  const poolBSC = new sql.ConnectionPool(configBSC);
+  const poolIntranet = new sql.ConnectionPool(makeConfig('Intranet'));
+  const poolBSC      = new sql.ConnectionPool(makeConfig('BSC'));
   try {
     await poolIntranet.connect();
     await poolBSC.connect();
