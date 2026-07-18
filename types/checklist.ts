@@ -1,4 +1,4 @@
-export type ChecklistStatus = 1 | 2; // 1=En proceso, 2=Completado
+export type ChecklistStatus = 1 | 2; // 1=En Proceso, 2=Completado
 export type ItemResultado = true | false | null; // true=Bueno, false=Malo, null=Sin evaluar
 
 export interface ChecklistSummary {
@@ -6,6 +6,7 @@ export interface ChecklistSummary {
   InvtID: number;
   CpnyID: number;
   Status: ChecklistStatus;
+  WeekRunID?: number | null;
   Crtd_DateTime: string;
   Crtd_User: number;
   Lupd_DateTime: string | null;
@@ -18,6 +19,7 @@ export interface ChecklistSummary {
   ModeloYr?: number;
   CExterior?: string;
   CpnyName?: string;
+  TotalItems?: number;
 }
 
 export interface ChecklistItem {
@@ -44,6 +46,7 @@ export interface VehicleRow {
   CExterior: string;
   Precio: number;
   Age: number;
+  Disponible?: string | number;
 }
 
 export interface TemplateItem {
@@ -51,6 +54,31 @@ export interface TemplateItem {
   Categoria: string;
   Descripcion: string;
   OrderIndex: number;
+}
+
+export interface WeekRunProgress {
+  WeekRunID: number;
+  CpnyID: number;
+  WeekStartDate: string;
+  TotalCreated: number;
+  CompletedCount: number;
+  PendingCount: number;
+  Crtd_DateTime: string;
+  Crtd_User: number;
+  CpnyName?: string;
+}
+
+export interface WeeklyGenerateResult {
+  weekStartDate: string;
+  companies: Array<{
+    cpnyId: number;
+    cpnyName: string;
+    weekRunId: number;
+    created: number;
+    totalCreated: number;
+    skipped: number;
+  }>;
+  totalCreated: number;
 }
 
 export interface PaginatedResult<T> {

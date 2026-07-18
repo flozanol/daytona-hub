@@ -17,9 +17,15 @@ export function makeConfig(database: string): sql.config {
 export async function withPool<T>(
   database: string,
   fn: (pool: sql.ConnectionPool) => Promise<T>,
+  opts?: { requestTimeoutMs?: number; silent?: boolean },
 ): Promise<T> {
   const cfg = makeConfig(database);
-  console.log(`[db] connecting → server="${cfg.server}" db="${cfg.database}" user="${cfg.user}"`);
+  if (opts?.requestTimeoutMs) {
+    cfg.requestTimeout = opts.requestTimeoutMs;
+  }
+  if (!opts?.silent) {
+    console.log(`[db] connecting → server="${cfg.server}" db="${cfg.database}" user="${cfg.user}"`);
+  }
   const pool = new sql.ConnectionPool(cfg);
   try {
     await pool.connect();

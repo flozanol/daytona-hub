@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth';
 import { canViewAll } from '@/lib/permissions';
 import { getCpnyIdByName, getVehicles } from '@/app/lib/db_checklist';
+import { getWeekStartDateMX } from '@/lib/week';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await getVehicles(cpnyId, search, page, pageSize);
+    const result = await getVehicles(cpnyId, search, page, pageSize, {
+      disponibleOnly: true,
+      excludeWeekStartDate: getWeekStartDateMX(),
+    });
     return NextResponse.json(result);
   } catch (error) {
     console.error('[GET /api/checklist/inventario]', error);

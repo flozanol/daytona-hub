@@ -14,6 +14,7 @@ export default async function ChecklistDetailPage({ params }: Props) {
 
   const user  = await getUser();
   const admin = user ? isAdmin(user.email) : false;
+  const canEdit = Boolean(user);
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-4">
@@ -23,7 +24,11 @@ export default async function ChecklistDetailPage({ params }: Props) {
       >
         <ArrowLeft size={14} /> Volver a la lista
       </Link>
-      <ChecklistDetailClient checklistId={checklistId} isAdmin={admin} />
+      <ChecklistDetailClient
+        checklistId={checklistId}
+        isAdmin={admin}
+        canEdit={canEdit}
+      />
     </div>
   );
 }

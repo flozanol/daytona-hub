@@ -11,6 +11,8 @@ import type { ChecklistSummary, ChecklistItem, ChecklistStatus, ItemResultado } 
 interface ChecklistDetailClientProps {
   checklistId: number;
   isAdmin: boolean;
+  /** Usuarios de la company (y admins) pueden evaluar y completar */
+  canEdit: boolean;
 }
 
 type Pending = { itemId: number; newValue: ItemResultado } | null;
@@ -128,7 +130,7 @@ function ResultadoToggle({
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailClientProps) {
+export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: ChecklistDetailClientProps) {
   const [checklist, setChecklist]   = useState<ChecklistSummary | null>(null);
   const [items, setItems]           = useState<ChecklistItem[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -241,8 +243,8 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
   const evaluated  = bueno + malo;
   const allDone    = total > 0 && sinEval === 0;
   const progress   = total > 0 ? (evaluated / total) * 100 : 0;
-  // Edición permitida solo si es admin Y el checklist NO está completado
-  const isEditable = isAdmin && checklist.Status !== 2;
+  // Edición: usuarios de la company (o admin) mientras no esté completado
+  const isEditable = canEdit && checklist.Status !== 2;
 
   return (
     <>
@@ -255,7 +257,7 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
       )}
 
       {/* Padding inferior en móvil para no quedar tapado por la barra sticky */}
-      <div className="space-y-4 pb-0 md:pb-0" style={{ paddingBottom: isAdmin ? undefined : undefined }}>
+      <div className="space-y-4 pb-0 md:pb-0">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-5">
@@ -287,15 +289,17 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
           </div>
 
           {/* Botones de status — solo desktop, solo si no está completado */}
-          {isAdmin && checklist.Status !== 2 && (
+          {isEditable && (
             <div className="hidden md:flex gap-2 flex-wrap mt-4 pt-4 border-t border-gray-100">
-              <button
-                onClick={() => handleStatusChange(1)}
-                disabled={checklist.Status === 1 || saving}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-yellow-300 text-yellow-700 hover:bg-yellow-50 disabled:opacity-40 transition-colors"
-              >
-                Marcar En proceso
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => handleStatusChange(1)}
+                  disabled={checklist.Status === 1 || saving}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-yellow-300 text-yellow-700 hover:bg-yellow-50 disabled:opacity-40 transition-colors"
+                >
+                  Marcar En Proceso
+                </button>
+              )}
               <button
                 onClick={() => handleStatusChange(2)}
                 disabled={saving}
@@ -466,8 +470,8 @@ export function ChecklistDetailClient({ checklistId, isAdmin }: ChecklistDetailC
         </div>
       </div>
 
-      {/* ── Barra sticky inferior (móvil, solo admins) ────────────────── */}
-      {isAdmin && (
+      {/* ── Barra sticky inferior (móvil) ────────────────── */}
+      {canEdit && (
         <div className="fixed bottom-0 left-0 right-0 md:hidden z-30">
           {/* Barra de progreso */}
           <div className="h-1 bg-gray-200">

@@ -8,12 +8,18 @@ import {
   getVehicleById,
   getChecklistTemplate,
   addChecklistItem,
+  ensureWeekRun,
+  DuplicateWeekChecklistError,
 } from '@/app/lib/db_checklist';
-// getCpnyIdByName sigue usándose en GET para no-admins
+import { getWeekStartDateMX } from '@/lib/week';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/checklist?page=1&pageSize=20
+function isDisponible(value: unknown): boolean {
+  return String(value).trim() === '1';
+}
+
+// GET /api/checklist?page=1&pageSize=20&weekRunId=
 export async function GET(request: NextRequest) {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
@@ -21,6 +27,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const page     = Math.max(1, parseInt(searchParams.get('page')     ?? '1'));
   const pageSize = Math.min(50, parseInt(searchParams.get('pageSize') ?? '20'));
+  const weekRunRaw = searchParams.get('weekRunId');
+  const weekRunId = weekRunRaw ? parseInt(weekRunRaw) : null;
 
   let cpnyId = 0; // 0 = todos (admin)
   if (!canViewAll(user.email)) {
@@ -35,7 +43,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await getChecklistsByPage(cpnyId, page, pageSize);
+    const result = await getChecklistsByPage(
+      cpnyId,
+      page,
+      pageSize,
+      Number.isFinite(weekRunId) && weekRunId! > 0 ? weekRunId : null,
+    );
     return NextResponse.json(result);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -60,13 +73,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'invtId inválido' }, { status: 400 });
   }
 
-  // Siempre obtenemos el vehículo — su CpnyID es la fuente de verdad
   const vehicle = await getVehicleById(invtId);
   if (!vehicle) {
     return NextResponse.json({ error: 'Vehículo no encontrado' }, { status: 404 });
   }
 
-  // No-admins: validar que el vehículo pertenece a su empresa por CpnyName
+  if (!isDisponible(vehicle.Disponible)) {
+    return NextResponse.json({ error: 'El vehículo no está disponible para checklist' }, { status: 400 });
+  }
+
   if (!canViewAll(user.email)) {
     if (!user.company || vehicle.CpnyName.trim().toLowerCase() !== user.company.trim().toLowerCase()) {
       return NextResponse.json({ error: 'No tienes acceso a ese vehículo' }, { status: 403 });
@@ -74,11 +89,13 @@ export async function POST(request: NextRequest) {
   }
 
   const cpnyId = vehicle.CpnyID;
+  const weekStartDate = getWeekStartDateMX();
+  const crtdUser = parseInt(user.userID) || 0;
 
   try {
-    const checklistId = await addChecklist(invtId, cpnyId, parseInt(user.userID));
+    const weekRunId = await ensureWeekRun(cpnyId, weekStartDate, crtdUser);
+    const checklistId = await addChecklist(invtId, cpnyId, crtdUser, weekRunId);
 
-    // Auto-poblar con los ítems del template (en paralelo, no bloquea si falla)
     const templateItems = await getChecklistTemplate().catch(() => []);
     if (templateItems.length > 0) {
       await Promise.all(
@@ -88,8 +105,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ checklistId }, { status: 201 });
+    return NextResponse.json({ checklistId, weekRunId }, { status: 201 });
   } catch (error) {
+    if (error instanceof DuplicateWeekChecklistError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: 'Error al crear checklist', details: msg }, { status: 500 });
   }

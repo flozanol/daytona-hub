@@ -8,6 +8,18 @@ export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ id: string }> };
 
+async function assertCompanyAccess(
+  user: NonNullable<Awaited<ReturnType<typeof getUser>>>,
+  checklistCpnyId: number,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  if (canViewAll(user.email)) return { ok: true };
+  if (!user.company) return { ok: false, status: 400, error: 'Empresa no definida en el token' };
+  const cpnyId = await getCpnyIdByName(user.company);
+  if (cpnyId === null) return { ok: false, status: 400, error: 'Empresa no encontrada' };
+  if (cpnyId !== checklistCpnyId) return { ok: false, status: 403, error: 'Acceso denegado' };
+  return { ok: true };
+}
+
 // GET /api/checklist/[id]
 export async function GET(_request: NextRequest, { params }: Params) {
   const user = await getUser();
@@ -22,12 +34,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
   const checklist = await getSingleChecklist(checklistId);
   if (!checklist) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
-  // Non-admins can only see their company's checklists
-  if (!canViewAll(user.email) && user.company) {
-    const cpnyId = await getCpnyIdByName(user.company);
-    if (cpnyId !== checklist.CpnyID) {
-      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
-    }
+  const access = await assertCompanyAccess(user, checklist.CpnyID);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   return NextResponse.json(checklist);
@@ -48,6 +57,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
   }
 
+  const checklist = await getSingleChecklist(checklistId);
+  if (!checklist) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+
+  const access = await assertCompanyAccess(user, checklist.CpnyID);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   let body: { status?: unknown };
   try {
     body = await request.json();
@@ -57,7 +74,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const status = body.status as ChecklistStatus;
   if (status !== 1 && status !== 2) {
-    return NextResponse.json({ error: 'Status debe ser 1 (En proceso) o 2 (Completado)' }, { status: 400 });
+    return NextResponse.json({ error: 'Status debe ser 1 (En Proceso) o 2 (Completado)' }, { status: 400 });
   }
 
   try {

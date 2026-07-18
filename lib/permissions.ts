@@ -17,14 +17,25 @@ export function canDelete(email: string): boolean {
   return isAdmin(email);
 }
 
-/** Solo admins pueden agregar / editar / eliminar ítems */
+/** Solo admins pueden agregar / eliminar ítems (estructura del checklist) */
 export function canManageItems(email: string): boolean {
   return isAdmin(email);
 }
 
-/** Solo admins pueden cambiar el status (En proceso → Completado) */
-export function canChangeStatus(email: string): boolean {
-  return isAdmin(email);
+/**
+ * Evaluar Bueno/Malo y notas.
+ * El alcance por empresa se valida en la API contra checklist.CpnyID.
+ */
+export function canEvaluateItems(_email: string): boolean {
+  return true;
+}
+
+/**
+ * Cambiar status (En Proceso → Completado).
+ * El alcance por empresa se valida en la API contra checklist.CpnyID.
+ */
+export function canChangeStatus(_email: string): boolean {
+  return true;
 }
 
 /** Todos los usuarios autenticados pueden crear checklists para su empresa */

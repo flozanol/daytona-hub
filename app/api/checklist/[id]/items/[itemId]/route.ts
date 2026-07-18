@@ -1,11 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth';
-import { canManageItems } from '@/lib/permissions';
-import { updateChecklistItem, deleteChecklistItem } from '@/app/lib/db_checklist';
+import { canEvaluateItems, canManageItems, canViewAll } from '@/lib/permissions';
+import {
+  getCpnyIdByName,
+  getSingleChecklist,
+  updateChecklistItem,
+  deleteChecklistItem,
+} from '@/app/lib/db_checklist';
 
 export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ id: string; itemId: string }> };
+
+async function assertCompanyAccess(
+  user: NonNullable<Awaited<ReturnType<typeof getUser>>>,
+  checklistId: number,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const checklist = await getSingleChecklist(checklistId);
+  if (!checklist) return { ok: false, status: 404, error: 'Checklist no encontrado' };
+  if (canViewAll(user.email)) return { ok: true };
+  if (!user.company) return { ok: false, status: 400, error: 'Empresa no definida en el token' };
+  const cpnyId = await getCpnyIdByName(user.company);
+  if (cpnyId === null) return { ok: false, status: 400, error: 'Empresa no encontrada' };
+  if (cpnyId !== checklist.CpnyID) return { ok: false, status: 403, error: 'Acceso denegado' };
+  return { ok: true };
+}
 
 // PATCH /api/checklist/[id]/items/[itemId]
 // { categoria, descripcion, resultado, notas }
@@ -13,14 +32,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
 
-  if (!canManageItems(user.email)) {
+  if (!canEvaluateItems(user.email)) {
     return NextResponse.json({ error: 'Sin permiso para editar ítems' }, { status: 403 });
   }
 
-  const { itemId } = await params;
+  const { id, itemId } = await params;
+  const checklistId = parseInt(id);
   const itemIdNum = parseInt(itemId);
-  if (!Number.isFinite(itemIdNum)) {
-    return NextResponse.json({ error: 'itemId inválido' }, { status: 400 });
+  if (!Number.isFinite(checklistId) || !Number.isFinite(itemIdNum)) {
+    return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+  }
+
+  const access = await assertCompanyAccess(user, checklistId);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   let body: {
