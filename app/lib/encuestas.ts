@@ -90,6 +90,30 @@ function parseCsvLine(line: string): string[] {
   return result;
 }
 
+/**
+ * Verifica si un string puede interpretarse como una fecha real.
+ * Acepta formatos comunes de Google Forms: "26/07/2024 10:30:00", "2024-07-26T10:30:00", etc.
+ * Rechaza encabezados como "Marca temporal", "Timestamp", etc.
+ */
+function esFechaValida(value: string): boolean {
+  if (!value || value.trim().length === 0) return false;
+  // Rechazar explícitamente texto que parece encabezado
+  const lower = value.toLowerCase().trim();
+  if (
+    lower.startsWith('marca') ||
+    lower.startsWith('timestamp') ||
+    lower.startsWith('fecha') ||
+    lower.startsWith('hora') ||
+    lower.startsWith('date') ||
+    lower.startsWith('time')
+  ) return false;
+  // Intentar parsear como fecha — Google Forms usa "dd/mm/yyyy hh:mm:ss"
+  // Normalizar separadores para que Date() lo entienda
+  const normalized = value.replace(/(\d{1,2})\/(\d{1,2})\/(\d{4})/, '$3-$2-$1');
+  const d = new Date(normalized);
+  return !isNaN(d.getTime());
+}
+
 async function fetchSheetCSV(sheetName: string): Promise<EncuestaRow[]> {
   // Construir URL de exportación CSV con el nombre de la hoja
   const encodedName = encodeURIComponent(sheetName);
@@ -124,7 +148,10 @@ async function fetchSheetCSV(sheetName: string): Promise<EncuestaRow[]> {
       comentario:    cols[13] ?? '',
     });
   }
-  return rows.filter(r => r.marcaTemporal.length > 0); // Filtrar filas vacías
+
+  // Filtrar solo filas cuya marca temporal sea una fecha válida
+  // Esto evita contar filas de encabezado repetidas, filas vacías o metadatos del Sheet
+  return rows.filter(r => esFechaValida(r.marcaTemporal));
 }
 
 function buildResumen(nombre: AgenciaNombre, rows: EncuestaRow[]): AgenciaResumen {
