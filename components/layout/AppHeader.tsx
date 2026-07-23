@@ -5,19 +5,20 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Car, Key, Wrench, Megaphone, LayoutDashboard,
-  Factory, LogOut, ClipboardCheck, Menu, X,
+  Factory, LogOut, ClipboardCheck, Menu, X, ClipboardList,
 } from 'lucide-react';
 import { logout } from '@/app/actions/auth';
 import type { AuthUser } from '@/lib/auth';
 
 const NAV_ITEMS = [
-  { href: '/',           label: 'Centro de Comando', Icon: LayoutDashboard },
-  { href: '/nuevos',     label: 'Autos Nuevos',       Icon: Car             },
-  { href: '/seminuevos', label: 'Seminuevos',          Icon: Key             },
-  { href: '/postventa',  label: 'Postventa',           Icon: Wrench          },
-  { href: '/marketing',  label: 'Marketing',           Icon: Megaphone       },
-  { href: '/yakimura',   label: 'Yakimura',            Icon: Factory         },
-  { href: '/checklist',  label: 'Checklist',           Icon: ClipboardCheck  },
+  { href: '/',            label: 'Centro de Comando', Icon: LayoutDashboard },
+  { href: '/nuevos',      label: 'Autos Nuevos',       Icon: Car             },
+  { href: '/seminuevos',  label: 'Seminuevos',          Icon: Key             },
+  { href: '/postventa',   label: 'Postventa',           Icon: Wrench          },
+  { href: '/marketing',   label: 'Marketing',           Icon: Megaphone       },
+  { href: '/yakimura',    label: 'Yakimura',            Icon: Factory         },
+  { href: '/checklist',   label: 'Checklist',           Icon: ClipboardCheck  },
+  { href: '/encuestas',   label: 'Encuestas',           Icon: ClipboardList   },
 ] as const;
 
 interface AppHeaderProps {
