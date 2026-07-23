@@ -13,6 +13,7 @@ const AGENCIAS = [
   'MG Cuajimalpa',
   'MG Interlomas',
   'MG Iztapalapa',
+    'Acura Interlomas',
 ] as const;
 
 export type AgenciaNombre = typeof AGENCIAS[number];
