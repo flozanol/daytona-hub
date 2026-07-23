@@ -17,7 +17,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const id = parseInt(itemId);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
-  let body: { categoria?: unknown; descripcion?: unknown; orderIndex?: unknown };
+  let body: { categoria?: unknown; descripcion?: unknown; orderIndex?: unknown; tipoItem?: unknown; opciones?: unknown };
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: 'Body inválido' }, { status: 400 });
   }
@@ -28,9 +28,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'categoria y descripcion son requeridos' }, { status: 400 });
   }
   const orderIndex = typeof body.orderIndex === 'number' ? body.orderIndex : 0;
+  const tipoItem = body.tipoItem === 'opciones' ? 'opciones' as const : 'boolean' as const;
+  const opciones = tipoItem === 'opciones' && Array.isArray(body.opciones)
+    ? (body.opciones as unknown[]).filter((o): o is string => typeof o === 'string' && o.trim() !== '')
+    : null;
 
   try {
-    await updateTemplateItem(id, categoria, descripcion, orderIndex);
+    await updateTemplateItem(id, categoria, descripcion, orderIndex, tipoItem, opciones?.length ? opciones : null);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('[PATCH /api/checklist/template]', error);

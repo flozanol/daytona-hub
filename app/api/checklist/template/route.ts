@@ -20,13 +20,13 @@ export async function GET() {
   }
 }
 
-// POST /api/checklist/template  { categoria, descripcion, orderIndex }
+// POST /api/checklist/template  { categoria, descripcion, orderIndex, tipoItem?, opciones? }
 export async function POST(request: NextRequest) {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
   if (!isAdmin(user.email)) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 });
 
-  let body: { categoria?: unknown; descripcion?: unknown; orderIndex?: unknown };
+  let body: { categoria?: unknown; descripcion?: unknown; orderIndex?: unknown; tipoItem?: unknown; opciones?: unknown };
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: 'Body inválido' }, { status: 400 });
   }
@@ -37,9 +37,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'categoria y descripcion son requeridos' }, { status: 400 });
   }
   const orderIndex = typeof body.orderIndex === 'number' ? body.orderIndex : 0;
+  const tipoItem = body.tipoItem === 'opciones' ? 'opciones' as const : 'boolean' as const;
+  const opciones = tipoItem === 'opciones' && Array.isArray(body.opciones)
+    ? (body.opciones as unknown[]).filter((o): o is string => typeof o === 'string' && o.trim() !== '')
+    : null;
 
   try {
-    const id = await addTemplateItem(categoria, descripcion, orderIndex);
+    const id = await addTemplateItem(categoria, descripcion, orderIndex, tipoItem, opciones?.length ? opciones : null);
     return NextResponse.json({ templateItemId: id }, { status: 201 });
   } catch (error) {
     console.error('[POST /api/checklist/template]', error);

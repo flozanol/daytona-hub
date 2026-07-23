@@ -1,5 +1,6 @@
 export type ChecklistStatus = 1 | 2; // 1=En Proceso, 2=Completado
 export type ItemResultado = true | false | null; // true=Bueno, false=Malo, null=Sin evaluar
+export type TipoItem = 'boolean' | 'opciones';
 
 export interface ChecklistSummary {
   ChecklistID: number;
@@ -30,6 +31,9 @@ export interface ChecklistItem {
   Resultado: ItemResultado;
   Notas: string | null;
   OrderIndex: number;
+  TipoItem: TipoItem;
+  Opciones: string[] | null;       // opciones disponibles (solo TipoItem='opciones')
+  ResultadoOpcion: string | null;  // respuesta seleccionada (solo TipoItem='opciones')
 }
 
 export interface VehicleRow {
@@ -54,6 +58,8 @@ export interface TemplateItem {
   Categoria: string;
   Descripcion: string;
   OrderIndex: number;
+  TipoItem: TipoItem;
+  Opciones: string[] | null;  // opciones disponibles (solo TipoItem='opciones')
 }
 
 export interface WeekRunProgress {

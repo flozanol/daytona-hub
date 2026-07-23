@@ -53,6 +53,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     descripcion?: unknown;
     resultado?: unknown;
     notas?: unknown;
+    resultadoOpcion?: unknown;
   };
   try {
     body = await request.json();
@@ -66,11 +67,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'categoria y descripcion son requeridos' }, { status: 400 });
   }
 
-  const resultado = body.resultado === true ? true : body.resultado === false ? false : null;
-  const notas     = typeof body.notas === 'string' ? body.notas : null;
+  const resultado       = body.resultado === true ? true : body.resultado === false ? false : null;
+  const notas           = typeof body.notas           === 'string' ? body.notas           : null;
+  const resultadoOpcion = typeof body.resultadoOpcion === 'string' ? body.resultadoOpcion : null;
 
   try {
-    await updateChecklistItem(itemIdNum, categoria, descripcion, resultado, notas);
+    await updateChecklistItem(itemIdNum, categoria, descripcion, resultado, notas, resultadoOpcion);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

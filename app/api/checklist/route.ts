@@ -100,7 +100,10 @@ export async function POST(request: NextRequest) {
     if (templateItems.length > 0) {
       await Promise.all(
         templateItems.map((t, i) =>
-          addChecklistItem(checklistId, t.Categoria, t.Descripcion, null, null, t.OrderIndex ?? i),
+          addChecklistItem(
+            checklistId, t.Categoria, t.Descripcion, null, null, t.OrderIndex ?? i,
+            t.TipoItem, t.Opciones,
+          ),
         ),
       );
     }

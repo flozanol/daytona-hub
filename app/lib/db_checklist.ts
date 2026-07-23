@@ -9,7 +9,16 @@ import type {
   PaginatedResult,
   WeekRunProgress,
   WeeklyGenerateResult,
+  TipoItem,
 } from '@/types/checklist';
+
+type RawTemplateItem  = Omit<TemplateItem,  'Opciones' | 'TipoItem'> & { Opciones: string | null; TipoItem: string };
+type RawChecklistItem = Omit<ChecklistItem, 'Opciones' | 'TipoItem'> & { Opciones: string | null; TipoItem: string };
+
+function parseOpciones(raw: string | null): string[] | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw) as string[]; } catch { return null; }
+}
 
 function withPool<T>(
   fn: (pool: sql.ConnectionPool) => Promise<T>,
@@ -317,7 +326,14 @@ export async function generateWeeklyChecklists(
 
         // 6) Ítems del template en INSERTs por lotes (límite ~2100 params en SQL Server)
         if (templateItems.length > 0 && createdRows.length > 0) {
-          type ItemRow = { checklistId: number; categoria: string; descripcion: string; orderIndex: number };
+          type ItemRow = {
+            checklistId: number;
+            categoria: string;
+            descripcion: string;
+            orderIndex: number;
+            tipoItem: string;
+            opciones: string | null;
+          };
           const allItems: ItemRow[] = [];
           for (const row of createdRows) {
             for (const t of templateItems) {
@@ -326,11 +342,13 @@ export async function generateWeeklyChecklists(
                 categoria: t.Categoria,
                 descripcion: t.Descripcion,
                 orderIndex: t.OrderIndex ?? 0,
+                tipoItem: t.TipoItem ?? 'boolean',
+                opciones: t.Opciones ? JSON.stringify(t.Opciones) : null,
               });
             }
           }
 
-          const BATCH = 400; // 400 * 4 params = 1600 < 2100
+          const BATCH = 200; // 200 * 8 params = 1600 < 2100
           cronLog('  insertando ítems template…', {
             rows: allItems.length,
             batches: Math.ceil(allItems.length / BATCH),
@@ -340,15 +358,17 @@ export async function generateWeeklyChecklists(
             const slice = allItems.slice(offset, offset + BATCH);
             const itemReq = pool.request();
             const itemValues = slice.map((item, i) => {
-              itemReq.input(`C${i}`, sql.Int, item.checklistId);
-              itemReq.input(`Cat${i}`, sql.NVarChar(80), item.categoria);
-              itemReq.input(`Des${i}`, sql.NVarChar(200), item.descripcion);
-              itemReq.input(`Ord${i}`, sql.Int, item.orderIndex);
-              return `(@C${i}, @Cat${i}, @Des${i}, NULL, NULL, @Ord${i})`;
+              itemReq.input(`C${i}`,    sql.Int,           item.checklistId);
+              itemReq.input(`Cat${i}`,  sql.NVarChar(80),  item.categoria);
+              itemReq.input(`Des${i}`,  sql.NVarChar(200), item.descripcion);
+              itemReq.input(`Ord${i}`,  sql.Int,           item.orderIndex);
+              itemReq.input(`Tipo${i}`, sql.NVarChar(20),  item.tipoItem);
+              itemReq.input(`Opt${i}`,  sql.NVarChar(1000), item.opciones);
+              return `(@C${i}, @Cat${i}, @Des${i}, NULL, NULL, @Ord${i}, @Tipo${i}, @Opt${i})`;
             });
             await itemReq.query(`
               INSERT INTO dbo.Smnvo_ChecklistItems
-                (ChecklistID, Categoria, Descripcion, Resultado, Notas, OrderIndex)
+                (ChecklistID, Categoria, Descripcion, Resultado, Notas, OrderIndex, TipoItem, Opciones)
               VALUES ${itemValues.join(',\n')}
             `);
           }
@@ -494,46 +514,58 @@ export async function getItemsByChecklist(checklistId: number): Promise<Checklis
     const result = await pool.request()
       .input('ChecklistID', sql.Int, checklistId)
       .execute('Smnvo_GetItemsByChecklist');
-    return result.recordset as ChecklistItem[];
+    return (result.recordset as RawChecklistItem[]).map(row => ({
+      ...row,
+      TipoItem: (row.TipoItem ?? 'boolean') as TipoItem,
+      Opciones: parseOpciones(row.Opciones),
+    }));
   });
 }
 
 export async function addChecklistItem(
-  checklistId: number,
-  categoria:   string,
-  descripcion: string,
-  resultado:   boolean | null,
-  notas:       string | null,
-  orderIndex:  number,
+  checklistId:     number,
+  categoria:       string,
+  descripcion:     string,
+  resultado:       boolean | null,
+  notas:           string | null,
+  orderIndex:      number,
+  tipoItem:        TipoItem = 'boolean',
+  opciones:        string[] | null = null,
+  resultadoOpcion: string | null = null,
 ): Promise<number> {
   return withPool(async (pool) => {
     const result = await pool.request()
-      .input('ChecklistID',  sql.Int,          checklistId)
-      .input('Categoria',    sql.NVarChar(80),  categoria)
-      .input('Descripcion',  sql.NVarChar(200), descripcion)
-      .input('Resultado',    sql.Bit,           resultado)
-      .input('Notas',        sql.NVarChar(255), notas)
-      .input('OrderIndex',   sql.Int,           orderIndex)
-      .output('ItemID',      sql.Int)
+      .input('ChecklistID',     sql.Int,           checklistId)
+      .input('Categoria',       sql.NVarChar(80),  categoria)
+      .input('Descripcion',     sql.NVarChar(200), descripcion)
+      .input('Resultado',       sql.Bit,           resultado)
+      .input('Notas',           sql.NVarChar(255), notas)
+      .input('OrderIndex',      sql.Int,           orderIndex)
+      .input('TipoItem',        sql.NVarChar(20),  tipoItem)
+      .input('Opciones',        sql.NVarChar(1000), opciones ? JSON.stringify(opciones) : null)
+      .input('ResultadoOpcion', sql.NVarChar(200), resultadoOpcion)
+      .output('ItemID',         sql.Int)
       .execute('Smnvo_AddChecklistItem');
     return result.output['ItemID'] as number;
   });
 }
 
 export async function updateChecklistItem(
-  itemId:      number,
-  categoria:   string,
-  descripcion: string,
-  resultado:   boolean | null,
-  notas:       string | null,
+  itemId:          number,
+  categoria:       string,
+  descripcion:     string,
+  resultado:       boolean | null,
+  notas:           string | null,
+  resultadoOpcion: string | null = null,
 ): Promise<void> {
   return withPool(async (pool) => {
     await pool.request()
-      .input('ItemID',      sql.Int,          itemId)
-      .input('Categoria',   sql.NVarChar(80),  categoria)
-      .input('Descripcion', sql.NVarChar(200), descripcion)
-      .input('Resultado',   sql.Bit,           resultado)
-      .input('Notas',       sql.NVarChar(255), notas)
+      .input('ItemID',          sql.Int,           itemId)
+      .input('Categoria',       sql.NVarChar(80),  categoria)
+      .input('Descripcion',     sql.NVarChar(200), descripcion)
+      .input('Resultado',       sql.Bit,           resultado)
+      .input('Notas',           sql.NVarChar(255), notas)
+      .input('ResultadoOpcion', sql.NVarChar(200), resultadoOpcion)
       .execute('Smnvo_UpdateChecklistItem');
   });
 }
@@ -553,7 +585,11 @@ export async function deleteChecklistItem(itemId: number): Promise<void> {
 export async function getChecklistTemplate(): Promise<TemplateItem[]> {
   return withPool(async (pool) => {
     const result = await pool.request().execute('Smnvo_GetChecklistTemplate');
-    return result.recordset as TemplateItem[];
+    return (result.recordset as RawTemplateItem[]).map(row => ({
+      ...row,
+      TipoItem: (row.TipoItem ?? 'boolean') as TipoItem,
+      Opciones: parseOpciones(row.Opciones),
+    }));
   });
 }
 
@@ -561,12 +597,16 @@ export async function addTemplateItem(
   categoria:   string,
   descripcion: string,
   orderIndex:  number,
+  tipoItem:    TipoItem = 'boolean',
+  opciones:    string[] | null = null,
 ): Promise<number> {
   return withPool(async (pool) => {
     const result = await pool.request()
-      .input('Categoria',      sql.NVarChar(80),  categoria)
-      .input('Descripcion',    sql.NVarChar(200), descripcion)
-      .input('OrderIndex',     sql.Int,           orderIndex)
+      .input('Categoria',      sql.NVarChar(80),   categoria)
+      .input('Descripcion',    sql.NVarChar(200),  descripcion)
+      .input('OrderIndex',     sql.Int,            orderIndex)
+      .input('TipoItem',       sql.NVarChar(20),   tipoItem)
+      .input('Opciones',       sql.NVarChar(1000), opciones ? JSON.stringify(opciones) : null)
       .output('TemplateItemID', sql.Int)
       .execute('Smnvo_AddTemplateItem');
     return result.output['TemplateItemID'] as number;
@@ -578,13 +618,17 @@ export async function updateTemplateItem(
   categoria:      string,
   descripcion:    string,
   orderIndex:     number,
+  tipoItem:       TipoItem = 'boolean',
+  opciones:       string[] | null = null,
 ): Promise<void> {
   return withPool(async (pool) => {
     await pool.request()
-      .input('TemplateItemID', sql.Int,           templateItemId)
-      .input('Categoria',      sql.NVarChar(80),  categoria)
-      .input('Descripcion',    sql.NVarChar(200), descripcion)
-      .input('OrderIndex',     sql.Int,           orderIndex)
+      .input('TemplateItemID', sql.Int,            templateItemId)
+      .input('Categoria',      sql.NVarChar(80),   categoria)
+      .input('Descripcion',    sql.NVarChar(200),  descripcion)
+      .input('OrderIndex',     sql.Int,            orderIndex)
+      .input('TipoItem',       sql.NVarChar(20),   tipoItem)
+      .input('Opciones',       sql.NVarChar(1000), opciones ? JSON.stringify(opciones) : null)
       .execute('Smnvo_UpdateTemplateItem');
   });
 }

@@ -65,6 +65,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     resultado?: unknown;
     notas?: unknown;
     orderIndex?: unknown;
+    tipoItem?: unknown;
+    opciones?: unknown;
+    resultadoOpcion?: unknown;
   };
   try {
     body = await request.json();
@@ -81,6 +84,11 @@ export async function POST(request: NextRequest, { params }: Params) {
   const resultado  = body.resultado === true ? true : body.resultado === false ? false : null;
   const notas      = typeof body.notas      === 'string' ? body.notas      : null;
   const orderIndex = typeof body.orderIndex === 'number' ? body.orderIndex : 0;
+  const tipoItem   = body.tipoItem === 'opciones' ? 'opciones' as const : 'boolean' as const;
+  const opciones   = tipoItem === 'opciones' && Array.isArray(body.opciones)
+    ? (body.opciones as unknown[]).filter((o): o is string => typeof o === 'string' && o.trim() !== '')
+    : null;
+  const resultadoOpcion = typeof body.resultadoOpcion === 'string' ? body.resultadoOpcion : null;
 
   try {
     const itemId = await addChecklistItem(
@@ -90,6 +98,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       resultado,
       notas,
       orderIndex,
+      tipoItem,
+      opciones?.length ? opciones : null,
+      resultadoOpcion,
     );
     return NextResponse.json({ itemId }, { status: 201 });
   } catch (error) {

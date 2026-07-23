@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Car, Key, Wrench, Megaphone, LayoutDashboard,
-  Factory, LogOut, ClipboardCheck, Menu, X, ClipboardList,
+  Factory, LogOut, ClipboardCheck, Menu, X, ClipboardList, PieChart,
 } from 'lucide-react';
 import { logout } from '@/app/actions/auth';
 import type { AuthUser } from '@/lib/auth';
@@ -17,8 +17,9 @@ const NAV_ITEMS = [
   { href: '/postventa',   label: 'Postventa',           Icon: Wrench          },
   { href: '/marketing',   label: 'Marketing',           Icon: Megaphone       },
   { href: '/yakimura',    label: 'Yakimura',            Icon: Factory         },
-  { href: '/checklist',   label: 'Checklist',           Icon: ClipboardCheck  },
-  { href: '/encuestas',   label: 'Encuestas',           Icon: ClipboardList   },
+  { href: '/checklist',        label: 'Checklist',        Icon: ClipboardCheck  },
+  { href: '/encuestas',        label: 'Encuestas',        Icon: ClipboardList   },
+  { href: '/reporte-rotacion', label: 'Rpt. Rotación',   Icon: PieChart        },
 ] as const;
 
 interface AppHeaderProps {

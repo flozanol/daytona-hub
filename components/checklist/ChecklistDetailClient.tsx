@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Loader2, Check, X, MessageSquare,
-  CheckCircle2, XCircle, MinusCircle, ArrowUp,
+  CheckCircle2, XCircle, MinusCircle, ArrowUp, List,
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import type { ChecklistSummary, ChecklistItem, ChecklistStatus, ItemResultado } from '@/types/checklist';
@@ -11,11 +11,13 @@ import type { ChecklistSummary, ChecklistItem, ChecklistStatus, ItemResultado } 
 interface ChecklistDetailClientProps {
   checklistId: number;
   isAdmin: boolean;
-  /** Usuarios de la company (y admins) pueden evaluar y completar */
   canEdit: boolean;
 }
 
-type Pending = { itemId: number; newValue: ItemResultado } | null;
+type Pending =
+  | { itemId: number; tipo: 'boolean'; newValue: ItemResultado }
+  | { itemId: number; tipo: 'opciones'; opcion: string | null }
+  | null;
 
 // ── Modal de notas ────────────────────────────────────────────────────────────
 function NotasModal({
@@ -82,13 +84,27 @@ function NotasModal({
 }
 
 // ── Badge solo lectura ────────────────────────────────────────────────────────
-function ResultadoBadge({ value }: { value: ItemResultado }) {
-  if (value === true)  return <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-full"><CheckCircle2 size={12} /> Bueno</span>;
-  if (value === false) return <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-full"><XCircle size={12} /> Malo</span>;
+function ResultadoBadge({ item }: { item: ChecklistItem }) {
+  if (item.TipoItem === 'opciones') {
+    if (item.ResultadoOpcion) {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">
+          <List size={12} /> {item.ResultadoOpcion}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
+        <MinusCircle size={12} /> Sin respuesta
+      </span>
+    );
+  }
+  if (item.Resultado === true)  return <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-full"><CheckCircle2 size={12} /> Bueno</span>;
+  if (item.Resultado === false) return <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-full"><XCircle size={12} /> Malo</span>;
   return <span className="inline-flex items-center gap-1.5 text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full"><MinusCircle size={12} /> Sin evaluar</span>;
 }
 
-// ── Toggle desktop ────────────────────────────────────────────────────────────
+// ── Toggle booleano (desktop) ─────────────────────────────────────────────────
 function ResultadoToggle({
   value,
   pending,
@@ -125,6 +141,44 @@ function ResultadoToggle({
         {isSaving && pending === false ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
         Malo
       </button>
+    </div>
+  );
+}
+
+// ── Selector de opciones (desktop) ───────────────────────────────────────────
+function OpcionesToggle({
+  item,
+  pendingOpcion,
+  onChange,
+}: {
+  item: ChecklistItem;
+  pendingOpcion: string | null | undefined; // undefined = no está guardando este ítem
+  onChange: (v: string | null) => void;
+}) {
+  const isSaving = pendingOpcion !== undefined;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {(item.Opciones ?? []).map(opcion => {
+        const isSelected = item.ResultadoOpcion === opcion;
+        return (
+          <button
+            key={opcion}
+            onClick={() => !isSaving && onChange(isSelected ? null : opcion)}
+            disabled={isSaving}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all disabled:cursor-not-allowed
+              ${isSelected
+                ? 'bg-blue-500 border-blue-500 text-white shadow-sm'
+                : 'border-gray-200 text-gray-400 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50'
+              }`}
+          >
+            {isSaving && pendingOpcion === opcion ? <Loader2 size={11} className="animate-spin" /> : null}
+            {opcion}
+          </button>
+        );
+      })}
+      {(item.Opciones ?? []).length === 0 && (
+        <span className="text-xs text-gray-400 italic">Sin opciones definidas</span>
+      )}
     </div>
   );
 }
@@ -167,12 +221,16 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  const patchItem = async (item: ChecklistItem, patch: Partial<{ resultado: ItemResultado; notas: string | null }>) => {
+  const patchItem = async (
+    item: ChecklistItem,
+    patch: Partial<{ resultado: ItemResultado; notas: string | null; resultadoOpcion: string | null }>,
+  ) => {
     const body = {
-      categoria:   item.Categoria,
-      descripcion: item.Descripcion,
-      resultado:   patch.resultado !== undefined ? patch.resultado : item.Resultado,
-      notas:       patch.notas     !== undefined ? patch.notas    : item.Notas,
+      categoria:       item.Categoria,
+      descripcion:     item.Descripcion,
+      resultado:       patch.resultado       !== undefined ? patch.resultado       : item.Resultado,
+      notas:           patch.notas           !== undefined ? patch.notas           : item.Notas,
+      resultadoOpcion: patch.resultadoOpcion !== undefined ? patch.resultadoOpcion : item.ResultadoOpcion,
     };
     const res = await fetch(`/api/checklist/${checklistId}/items/${item.ItemID}`, {
       method: 'PATCH',
@@ -181,13 +239,22 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
     });
     if (!res.ok) throw new Error((await res.json()).error ?? res.statusText);
     setItems(prev => prev.map(i =>
-      i.ItemID === item.ItemID ? { ...i, Resultado: body.resultado, Notas: body.notas } : i,
+      i.ItemID === item.ItemID
+        ? { ...i, Resultado: body.resultado, Notas: body.notas, ResultadoOpcion: body.resultadoOpcion }
+        : i,
     ));
   };
 
   const handleResultado = async (item: ChecklistItem, resultado: ItemResultado) => {
-    setPending({ itemId: item.ItemID, newValue: resultado });
+    setPending({ itemId: item.ItemID, tipo: 'boolean', newValue: resultado });
     try { await patchItem(item, { resultado }); }
+    catch (e) { alert(e instanceof Error ? e.message : 'Error al actualizar'); }
+    finally { setPending(null); }
+  };
+
+  const handleOpcion = async (item: ChecklistItem, opcion: string | null) => {
+    setPending({ itemId: item.ItemID, tipo: 'opciones', opcion });
+    try { await patchItem(item, { resultadoOpcion: opcion }); }
     catch (e) { alert(e instanceof Error ? e.message : 'Error al actualizar'); }
     finally { setPending(null); }
   };
@@ -235,16 +302,19 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
     );
   }
 
-  const vehicle    = [checklist.Marca, checklist.SubMarca, checklist.Version].filter(Boolean).join(' ');
-  const bueno      = items.filter(i => i.Resultado === true).length;
-  const malo       = items.filter(i => i.Resultado === false).length;
-  const sinEval    = items.filter(i => i.Resultado === null).length;
-  const total      = items.length;
-  const evaluated  = bueno + malo;
-  const allDone    = total > 0 && sinEval === 0;
-  const progress   = total > 0 ? (evaluated / total) * 100 : 0;
-  // Edición: usuarios de la company (o admin) mientras no esté completado
-  const isEditable = canEdit && checklist.Status !== 2;
+  const isEvaluated = (item: ChecklistItem) =>
+    item.TipoItem === 'opciones' ? item.ResultadoOpcion !== null : item.Resultado !== null;
+
+  const vehicle      = [checklist.Marca, checklist.SubMarca, checklist.Version].filter(Boolean).join(' ');
+  const bueno        = items.filter(i => i.TipoItem === 'boolean' && i.Resultado === true).length;
+  const malo         = items.filter(i => i.TipoItem === 'boolean' && i.Resultado === false).length;
+  const respondidos  = items.filter(i => i.TipoItem === 'opciones' && i.ResultadoOpcion !== null).length;
+  const total        = items.length;
+  const evaluated    = items.filter(isEvaluated).length;
+  const sinEval      = total - evaluated;
+  const allDone      = total > 0 && sinEval === 0;
+  const progress     = total > 0 ? (evaluated / total) * 100 : 0;
+  const isEditable   = canEdit && checklist.Status !== 2;
 
   return (
     <>
@@ -256,25 +326,21 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
         />
       )}
 
-      {/* Padding inferior en móvil para no quedar tapado por la barra sticky */}
       <div className="space-y-4 pb-0 md:pb-0">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-5">
 
-          {/* Título — más compacto en móvil */}
           <h1 className="text-base md:text-xl font-bold text-gray-900 leading-snug">
             {vehicle || 'Vehículo'} — {checklist.ModeloYr}
           </h1>
 
-          {/* Meta — solo desktop */}
           <p className="hidden sm:block text-sm text-gray-500 mt-1">
             Clave: <span className="font-mono">{checklist.SLInvtID ?? '—'}</span>
             {' · '}VIN: <span className="font-mono">{checklist.VIN ?? '—'}</span>
             {checklist.CpnyName && <> · {checklist.CpnyName}</>}
           </p>
 
-          {/* Status + conteos */}
           <div className="flex items-center gap-3 mt-2 flex-wrap">
             <StatusBadge status={checklist.Status} />
             {total > 0 && (
@@ -282,13 +348,15 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
                 <span className="text-green-600 font-semibold">{bueno} buenos</span>
                 {' · '}
                 <span className="text-red-500 font-semibold">{malo} malos</span>
+                {respondidos > 0 && (
+                  <> · <span className="text-blue-500 font-semibold">{respondidos} respondidos</span></>
+                )}
                 {' · '}
                 <span className="text-gray-400">{sinEval} sin evaluar</span>
               </span>
             )}
           </div>
 
-          {/* Botones de status — solo desktop, solo si no está completado */}
           {isEditable && (
             <div className="hidden md:flex gap-2 flex-wrap mt-4 pt-4 border-t border-gray-100">
               {isAdmin && (
@@ -325,15 +393,22 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
                 key={item.ItemID}
                 className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
               >
-                {/* Header card: categoría + nota */}
+                {/* Header card */}
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
-                  <span className="text-[10px] font-bold tracking-widest uppercase text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
-                    {item.Categoria}
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full shrink-0">
+                      {item.Categoria}
+                    </span>
+                    {item.TipoItem === 'opciones' && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full shrink-0">
+                        <List size={9} /> Opciones
+                      </span>
+                    )}
+                  </div>
                   {isEditable && (
                     <button
                       onClick={() => setNotasItem(item)}
-                      className={`p-2 rounded-xl transition-colors active:scale-95 ${
+                      className={`p-2 rounded-xl transition-colors active:scale-95 shrink-0 ${
                         item.Notas ? 'text-blue-500 bg-blue-50' : 'text-gray-300 active:bg-gray-100'
                       }`}
                     >
@@ -349,43 +424,79 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
 
                 <div className="h-px bg-gray-100 mx-4" />
 
-                {/* Botones */}
+                {/* Controles */}
                 <div className="p-3">
                   {isEditable ? (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => !isSavingThis && handleResultado(item, item.Resultado === true ? null : true)}
-                        disabled={isSavingThis}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed
-                          ${item.Resultado === true
-                            ? 'bg-green-500 text-white shadow-sm'
-                            : 'bg-gray-50 border border-gray-200 text-gray-500'
-                          }`}
-                      >
-                        {isSavingThis && pending?.newValue === true
-                          ? <Loader2 size={15} className="animate-spin" />
-                          : <Check size={15} className={item.Resultado === true ? 'text-white' : 'text-gray-400'} />
-                        }
-                        Bueno
-                      </button>
-                      <button
-                        onClick={() => !isSavingThis && handleResultado(item, item.Resultado === false ? null : false)}
-                        disabled={isSavingThis}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed
-                          ${item.Resultado === false
-                            ? 'bg-red-500 text-white shadow-sm'
-                            : 'bg-gray-50 border border-gray-200 text-gray-500'
-                          }`}
-                      >
-                        {isSavingThis && pending?.newValue === false
-                          ? <Loader2 size={15} className="animate-spin" />
-                          : <X size={15} className={item.Resultado === false ? 'text-white' : 'text-gray-400'} />
-                        }
-                        Malo
-                      </button>
-                    </div>
+                    item.TipoItem === 'opciones' ? (
+                      <div className="flex flex-wrap gap-2">
+                        {(item.Opciones ?? []).map(opcion => {
+                          const isSelected = item.ResultadoOpcion === opcion;
+                          const isSavingOpcion = isSavingThis && pending?.tipo === 'opciones' && pending?.opcion === opcion;
+                          return (
+                            <button
+                              key={opcion}
+                              onClick={() => !isSavingThis && handleOpcion(item, isSelected ? null : opcion)}
+                              disabled={isSavingThis}
+                              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed
+                                ${isSelected
+                                  ? 'bg-blue-500 text-white shadow-sm'
+                                  : 'bg-gray-50 border border-gray-200 text-gray-600'
+                                }`}
+                            >
+                              {isSavingOpcion
+                                ? <Loader2 size={14} className="animate-spin" />
+                                : isSelected ? <Check size={14} /> : null
+                              }
+                              {opcion}
+                            </button>
+                          );
+                        })}
+                        {(item.Opciones ?? []).length === 0 && (
+                          <span className="text-xs text-gray-400 py-2">Sin opciones definidas</span>
+                        )}
+                        {/* Spinner de deselect */}
+                        {isSavingThis && pending?.tipo === 'opciones' && pending?.opcion === null && (
+                          <div className="w-full flex items-center gap-1.5 text-xs text-gray-400 pt-1">
+                            <Loader2 size={11} className="animate-spin" /> Guardando…
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => !isSavingThis && handleResultado(item, item.Resultado === true ? null : true)}
+                          disabled={isSavingThis}
+                          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed
+                            ${item.Resultado === true
+                              ? 'bg-green-500 text-white shadow-sm'
+                              : 'bg-gray-50 border border-gray-200 text-gray-500'
+                            }`}
+                        >
+                          {isSavingThis && pending?.tipo === 'boolean' && pending?.newValue === true
+                            ? <Loader2 size={15} className="animate-spin" />
+                            : <Check size={15} className={item.Resultado === true ? 'text-white' : 'text-gray-400'} />
+                          }
+                          Bueno
+                        </button>
+                        <button
+                          onClick={() => !isSavingThis && handleResultado(item, item.Resultado === false ? null : false)}
+                          disabled={isSavingThis}
+                          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed
+                            ${item.Resultado === false
+                              ? 'bg-red-500 text-white shadow-sm'
+                              : 'bg-gray-50 border border-gray-200 text-gray-500'
+                            }`}
+                        >
+                          {isSavingThis && pending?.tipo === 'boolean' && pending?.newValue === false
+                            ? <Loader2 size={15} className="animate-spin" />
+                            : <X size={15} className={item.Resultado === false ? 'text-white' : 'text-gray-400'} />
+                          }
+                          Malo
+                        </button>
+                      </div>
+                    )
                   ) : (
-                    <div className="py-1"><ResultadoBadge value={item.Resultado} /></div>
+                    <div className="py-1"><ResultadoBadge item={item} /></div>
                   )}
                 </div>
 
@@ -397,8 +508,8 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
                   </div>
                 )}
 
-                {/* Guardando deselección */}
-                {isSavingThis && pending?.newValue === null && (
+                {/* Spinner de deselect booleano */}
+                {isSavingThis && pending?.tipo === 'boolean' && pending?.newValue === null && (
                   <div className="px-4 pb-3 flex items-center gap-1.5 text-xs text-gray-400">
                     <Loader2 size={11} className="animate-spin" /> Guardando…
                   </div>
@@ -418,46 +529,73 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
               <tr>
                 <th className="px-5 py-3 text-left w-32">Categoría</th>
                 <th className="px-5 py-3 text-left">Descripción</th>
-                <th className="px-5 py-3 text-left w-44">Resultado</th>
+                <th className="px-5 py-3 text-left w-56">Resultado</th>
                 <th className="px-5 py-3 text-left w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map(item => (
-                <tr key={item.ItemID} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3 font-medium text-gray-700 text-xs uppercase tracking-wide">{item.Categoria}</td>
-                  <td className="px-5 py-3 text-gray-600">{item.Descripcion}</td>
-                  <td className="px-5 py-3">
-                    {isEditable
-                      ? (
-                        <ResultadoToggle
-                          value={item.Resultado}
-                          pending={pending?.itemId === item.ItemID ? pending.newValue : undefined}
-                          onChange={(v) => handleResultado(item, v)}
-                        />
-                      )
-                      : <ResultadoBadge value={item.Resultado} />
-                    }
-                  </td>
-                  <td className="px-5 py-3">
-                    {isEditable ? (
-                      <button
-                        onClick={() => setNotasItem(item)}
-                        title={item.Notas ?? 'Agregar nota'}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          item.Notas
-                            ? 'text-blue-500 bg-blue-50 hover:bg-blue-100'
-                            : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'
-                        }`}
-                      >
-                        <MessageSquare size={15} />
-                      </button>
-                    ) : item.Notas ? (
-                      <span className="text-xs text-gray-400 italic">{item.Notas}</span>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
+              {items.map(item => {
+                const isSavingThis = pending?.itemId === item.ItemID;
+                return (
+                  <tr key={item.ItemID} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3 font-medium text-gray-700 text-xs uppercase tracking-wide">
+                      <div className="flex flex-col gap-1">
+                        <span>{item.Categoria}</span>
+                        {item.TipoItem === 'opciones' && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-500">
+                            <List size={9} /> Opciones
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-gray-600">{item.Descripcion}</td>
+                    <td className="px-5 py-3">
+                      {isEditable ? (
+                        item.TipoItem === 'opciones' ? (
+                          <OpcionesToggle
+                            item={item}
+                            pendingOpcion={
+                              isSavingThis && pending?.tipo === 'opciones'
+                                ? pending.opcion
+                                : undefined
+                            }
+                            onChange={(v) => handleOpcion(item, v)}
+                          />
+                        ) : (
+                          <ResultadoToggle
+                            value={item.Resultado}
+                            pending={
+                              isSavingThis && pending?.tipo === 'boolean'
+                                ? pending.newValue
+                                : undefined
+                            }
+                            onChange={(v) => handleResultado(item, v)}
+                          />
+                        )
+                      ) : (
+                        <ResultadoBadge item={item} />
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      {isEditable ? (
+                        <button
+                          onClick={() => setNotasItem(item)}
+                          title={item.Notas ?? 'Agregar nota'}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            item.Notas
+                              ? 'text-blue-500 bg-blue-50 hover:bg-blue-100'
+                              : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'
+                          }`}
+                        >
+                          <MessageSquare size={15} />
+                        </button>
+                      ) : item.Notas ? (
+                        <span className="text-xs text-gray-400 italic">{item.Notas}</span>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
               {total === 0 && (
                 <tr>
                   <td colSpan={4} className="px-5 py-10 text-center text-gray-400">
@@ -494,7 +632,6 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
             </button>
 
             {checklist.Status === 2 ? (
-              /* Estado completado — solo lectura */
               <div className="flex-1 flex items-center gap-2">
                 <CheckCircle2 size={18} className="text-green-500 shrink-0" />
                 <div>
@@ -504,7 +641,6 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
               </div>
             ) : (
               <>
-                {/* Conteo */}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-gray-700">
                     {evaluated} de {total} evaluados
@@ -521,7 +657,6 @@ export function ChecklistDetailClient({ checklistId, isAdmin, canEdit }: Checkli
                   )}
                 </div>
 
-                {/* Botón Completar */}
                 <button
                   onClick={() => handleStatusChange(2)}
                   disabled={!allDone || saving}
