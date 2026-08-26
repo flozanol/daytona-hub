@@ -4,22 +4,21 @@ import { getInventory } from '@/app/lib/db';
 const quantity = (row: any) =>
   Number(row.QtyAD ?? 0) + Number(row.QtyAF ?? 0) + Number(row.QtyAP ?? 0) + Number(row.QtyDP ?? 0);
 
+const location = (row: any) => String(row.Ubicacion ?? '').toUpperCase();
+
 export async function GET() {
   try {
     const rows = await getInventory();
     const inventory = Array.isArray(rows) ? rows : [];
-    const clinica = inventory.filter((row: any) =>
-      String(row.Ubicacion ?? '').toUpperCase().includes('CLINICA')
-    );
+    const clinica = inventory.filter((row: any) => {
+      const ub = location(row);
+      return ub.includes('MATRIZ') || ub.includes('CLINICA') || ub.includes('TECAMACHALCO');
+    });
 
-    const ventasConInventario = clinica.filter((row: any) =>
-      quantity(row) > 0
-    );
-    const inventarioSinHistorico = clinica.filter((row: any) =>
-      quantity(row) === 0
-    );
-
+    const ventasConInventario = clinica.filter((row: any) => quantity(row) > 0);
+    const inventarioSinHistorico = clinica.filter((row: any) => quantity(row) === 0);
     const sum = (items: any[]) => items.reduce((total, row) => total + quantity(row), 0);
+    const count = (items: any[]) => items.length;
 
     return NextResponse.json({
       ventasConInventario,
@@ -28,10 +27,10 @@ export async function GET() {
         totalClinica: sum(clinica),
         emparejado: sum(ventasConInventario),
         sinHistorico: sum(inventarioSinHistorico),
-        financiados: clinica.filter((r: any) => String(r.Ubicacion ?? '').toUpperCase().includes('FINANCIAD')).length,
-        propios: clinica.filter((r: any) => String(r.Ubicacion ?? '').toUpperCase().includes('PROPI')).length,
-        demos: clinica.filter((r: any) => String(r.Modelo ?? '').toUpperCase().includes('DEMO')).length,
-        demosPropios: clinica.filter((r: any) => String(r.Modelo ?? '').toUpperCase().includes('DEMO') && String(r.Ubicacion ?? '').toUpperCase().includes('PROPI')).length
+        financiados: count(clinica.filter((r: any) => location(r).includes('FINANCIAD'))),
+        propios: count(clinica.filter((r: any) => location(r).includes('MATRIZ') || location(r).includes('PROPI'))),
+        demos: count(clinica.filter((r: any) => String(r.Modelo ?? '').toUpperCase().includes('DEMO'))),
+        demosPropios: count(clinica.filter((r: any) => String(r.Modelo ?? '').toUpperCase().includes('DEMO') && (location(r).includes('MATRIZ') || location(r).includes('PROPI'))))
       }
     });
   } catch (error) {
