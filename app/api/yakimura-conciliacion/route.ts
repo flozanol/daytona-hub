@@ -19,6 +19,7 @@ export async function GET() {
     const inventarioSinHistorico = clinica.filter((row: any) => quantity(row) === 0);
     const sum = (items: any[]) => items.reduce((total, row) => total + quantity(row), 0);
     const count = (items: any[]) => items.length;
+    const sample = clinica.slice(0, 10);
 
     return NextResponse.json({
       ventasConInventario,
@@ -31,6 +32,24 @@ export async function GET() {
         propios: count(clinica.filter((r: any) => location(r).includes('MATRIZ') || location(r).includes('PROPI'))),
         demos: count(clinica.filter((r: any) => String(r.Modelo ?? '').toUpperCase().includes('DEMO'))),
         demosPropios: count(clinica.filter((r: any) => String(r.Modelo ?? '').toUpperCase().includes('DEMO') && (location(r).includes('MATRIZ') || location(r).includes('PROPI'))))
+      },
+      diagnostic: {
+        rowCount: clinica.length,
+        inventoryColumns: sample.length ? Object.keys(sample[0]) : [],
+        sample: sample.map((row: any) => ({
+          CpnyID: row.CpnyID,
+          BrandDescr: row.BrandDescr,
+          Modelo: row.Modelo,
+          Version: row.Version,
+          Anio: row.Anio,
+          Color: row.Color,
+          VIN: row.VIN,
+          Ubicacion: row.Ubicacion,
+          QtyAD: row.QtyAD,
+          QtyAF: row.QtyAF,
+          QtyAP: row.QtyAP,
+          QtyDP: row.QtyDP
+        }))
       }
     });
   } catch (error) {
