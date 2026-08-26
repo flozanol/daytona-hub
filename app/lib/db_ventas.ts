@@ -66,6 +66,10 @@ function normalizeModelo(valor: string): string {
 interface InventarioAgregado {
   QtyAF: number;
   QtyAP: number;
+  marcaOriginal: string;
+  modeloOriginal: string;
+  versionOriginal: string;
+  colorOriginal: string;
 }
 
 /**
@@ -172,7 +176,20 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
         existing.QtyAF += qtyAF;
         existing.QtyAP += qtyAP;
       } else {
-        invMap.set(key, { QtyAF: qtyAF, QtyAP: qtyAP });
+        // Guardamos también los textos originales (marca, modelo, versión,
+        // color tal cual vienen del inventario) para poder mostrarlos de
+        // forma legible si este modelo termina como fila "sin ventas" —
+        // antes se dejaban en blanco/genérico y eso hacía que, por ejemplo,
+        // el filtro de Marca en la pantalla de Yakimura ocultara por
+        // completo modelos nuevos o de marcas poco comunes (ej. "IM").
+        invMap.set(key, {
+          QtyAF: qtyAF,
+          QtyAP: qtyAP,
+          marcaOriginal: String(inv['BrandDescr'] ?? '').trim(),
+          modeloOriginal: String(inv['Modelo'] ?? '').trim(),
+          versionOriginal: String(inv['Version'] ?? '').trim(),
+          colorOriginal: String(inv['Color'] ?? '').trim(),
+        });
       }
     }
 
@@ -239,14 +256,14 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
     const extras: Record<string, unknown>[] = [];
     for (const [key, inv] of invMap.entries()) {
       if (gruposPorKey.has(key)) continue;
-      const [cpny, modelo, anioStr, color] = key.split('|');
+      const [cpny, , anioStr] = key.split('|');
       extras.push({
         CpnyId: cpny.toUpperCase(),
-        Marca: '',
-        SubMarca: modelo,
-        Version: '(sin ventas en 3 meses)',
+        Marca: inv.marcaOriginal,
+        SubMarca: inv.modeloOriginal,
+        Version: inv.versionOriginal ? `${inv.versionOriginal} (sin ventas en 3 meses)` : '(sin ventas en 3 meses)',
         Anio: Number(anioStr),
-        Color: color,
+        Color: inv.colorOriginal,
         Periodo_Menos_3: 0,
         Periodo_Menos_2: 0,
         Periodo_Menos_1: 0,
