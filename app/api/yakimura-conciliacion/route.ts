@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/app/lib/db';
+import { sql } from '@/app/lib/db';
 
 export async function GET() {
   try {
-    const sql = `
+    const result = await sql`
       WITH inv AS (
         SELECT
           i.id,
@@ -93,11 +93,10 @@ export async function GET() {
       SELECT 'resumen' AS tipo, resumen.* FROM resumen;
     `;
 
-    const rows = await db.query(sql);
-
+    const rows = result.rows ?? result;
     const ventasConInventario = rows.filter((r: any) => r.tipo === 'ventasConInventario');
     const inventarioSinHistorico = rows.filter((r: any) => r.tipo === 'inventarioSinHistorico');
-    const resumen = rows.filter((r: any) => r.tipo === 'resumen')[0] || {};
+    const resumen = rows.find((r: any) => r.tipo === 'resumen') || {};
 
     return NextResponse.json({
       ventasConInventario,
