@@ -35,128 +35,70 @@ function normalizeRow(row: Record<string, unknown>): VentaRow {
   };
 }
 
-/**
- * Normaliza SubBrandDescr del inventario para que coincida con SubMarca de ventas.
- * Ej: "Acura ADX A-spec" -> "adx", "CR-V Touring CVT" -> "cr-v", "K3" -> "k3"
- * Estrategia: quitar prefijos de marca conocidos, luego tomar el primer token.
- */
-function normalizeSubBrand(cpnyId: string, subBrandDescr: string): string {
-  let s = subBrandDescr.trim();
-  // Quitar prefijos de marca (case-insensitive)
-  const prefixes = ['Acura ', 'Honda ', 'KIA ', 'MG ', 'Kia ', 'Mg '];
-  for (const prefix of prefixes) {
-    if (s.toLowerCase().startsWith(prefix.toLowerCase())) {
-      s = s.substring(prefix.length).trim();
-      break;
-    }
-  }
-  // Tomar solo el primer token (el nombre del modelo)
-  // Excepciones: modelos con guion como CR-V, HR-V, BR-V
-  const firstToken = s.split(' ')[0];
-  return firstToken.toLowerCase();
-}
+const clinicInventoryConfig: sql.config = {
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  server: process.env.DB_SERVER ?? '',
+  database: process.env.DB_NAME,
+  port: parseInt(process.env.DB_PORT ?? '1433'),
+  options: { encrypt: true, trustServerCertificate: true },
+  connectionTimeout: 30_000,
+  requestTimeout: 30_000,
+};
+
+type InventoryTotals = { QtyAF: number; QtyAP: number; QtyAD: number; QtyDP: number };
+
+const norm = (value: unknown) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 export async function getVentasYakimura(): Promise<VentaRow[]> {
   const poolIntranet = new sql.ConnectionPool(makeConfig('Intranet'));
-  const poolBSC      = new sql.ConnectionPool(makeConfig('BSC'));
+  const poolInventory = new sql.ConnectionPool(clinicInventoryConfig);
+
   try {
     await poolIntranet.connect();
-    await poolBSC.connect();
+    await poolInventory.connect();
 
-    // Detectar nombres reales de columnas en la vista de ventas
-    const colResult = await poolIntranet.request().query(
-      'SELECT TOP 1 * FROM dbo.vw_VentasUltimos4Periodos'
-    );
-    const cols: string[] = colResult.recordset.length > 0
-      ? Object.keys(colResult.recordset[0])
-      : [];
-    const find = (candidates: string[]) =>
-      candidates.find(c => cols.includes(c))
-      ?? candidates.find(c => cols.map(x => x.toLowerCase()).includes(c.toLowerCase()))
-      ?? candidates[0];
-
-    const anioCol    = find(['Año', 'Anio', 'ModelYr', 'ANO', 'Áño']);
+    const colResult = await poolIntranet.request().query('SELECT TOP 1 * FROM dbo.vw_VentasUltimos4Periodos');
+    const cols: string[] = colResult.recordset.length > 0 ? Object.keys(colResult.recordset[0]) : [];
+    const find = (candidates: string[]) => candidates.find(c => cols.includes(c)) ?? candidates.find(c => cols.some(x => x.toLowerCase() === c.toLowerCase())) ?? candidates[0];
+    const anioCol = find(['Año', 'Anio', 'ModelYr', 'ANO', 'Áño']);
     const subMarcaCol = find(['SubMarca', 'SubBrandDescr']);
-    const versionCol  = find(['Version', 'VersionDescr', 'Versión']);
-    const colorCol    = find(['Color']);
-    const marcaCol    = find(['Marca', 'BrandDescr']);
-    const cpnyCol     = find(['CpnyId', 'CpnyID']);
+    const versionCol = find(['Version', 'VersionDescr', 'Versión']);
+    const colorCol = find(['Color']);
+    const marcaCol = find(['Marca', 'BrandDescr']);
+    const cpnyCol = find(['CpnyId', 'CpnyID']);
 
-    // Ventas desde Intranet
     const ventasResult = await poolIntranet.request().query(`
-      SELECT
-        LTRIM(RTRIM([${cpnyCol}])) AS CpnyId,
-        LTRIM(RTRIM([${marcaCol}])) AS Marca,
-        LTRIM(RTRIM([${subMarcaCol}])) AS SubMarca,
-        LTRIM(RTRIM([${versionCol}])) AS Version,
-        [${anioCol}] AS Anio,
-        LTRIM(RTRIM([${colorCol}])) AS Color,
-        ISNULL(Periodo_Menos_3, 0) AS Periodo_Menos_3,
-        ISNULL(Periodo_Menos_2, 0) AS Periodo_Menos_2,
-        ISNULL(Periodo_Menos_1, 0) AS Periodo_Menos_1,
-        ISNULL(Periodo_Actual,  0) AS Periodo_Actual
+      SELECT LTRIM(RTRIM([${cpnyCol}])) AS CpnyId, LTRIM(RTRIM([${marcaCol}])) AS Marca, LTRIM(RTRIM([${subMarcaCol}])) AS SubMarca, LTRIM(RTRIM([${versionCol}])) AS Version, [${anioCol}] AS Anio, LTRIM(RTRIM([${colorCol}])) AS Color, ISNULL(Periodo_Menos_3, 0) AS Periodo_Menos_3, ISNULL(Periodo_Menos_2, 0) AS Periodo_Menos_2, ISNULL(Periodo_Menos_1, 0) AS Periodo_Menos_1, ISNULL(Periodo_Actual, 0) AS Periodo_Actual
       FROM dbo.vw_VentasUltimos4Periodos
       ORDER BY [${subMarcaCol}], [${versionCol}], [${anioCol}], [${colorCol}]
     `);
 
-    // Inventario desde BSC: agrupar por CpnyId + SubBrandDescr
-    const invResult = await poolBSC.request().query(`
-      SELECT
-        LTRIM(RTRIM(CpnyID))       AS CpnyId,
-        LTRIM(RTRIM(SubBrandDescr)) AS SubBrandDescr,
-        SUM(ISNULL(QtyAF, 0))      AS QtyAF,
-        SUM(ISNULL(QtyAP, 0))      AS QtyAP
-      FROM dbo.Inventory
-      WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
-      GROUP BY LTRIM(RTRIM(CpnyID)), LTRIM(RTRIM(SubBrandDescr))
+    const invResult = await poolInventory.request().query(`
+      SELECT LTRIM(RTRIM(CpnyID)) AS CpnyId, LTRIM(RTRIM(BrandDescr)) AS Marca, LTRIM(RTRIM(Modelo)) AS SubMarca, LTRIM(RTRIM(Version)) AS Version, Anio, LTRIM(RTRIM(Color)) AS Color, VIN, Ubicacion, SUM(ISNULL(QtyAF, 0)) AS QtyAF, SUM(ISNULL(QtyAP, 0)) AS QtyAP, SUM(ISNULL(QtyAD, 0)) AS QtyAD, SUM(ISNULL(QtyDP, 0)) AS QtyDP
+      FROM Inventory
+      WHERE (QtyAF > 0 OR QtyAP > 0 OR QtyAD > 0 OR QtyDP > 0)
+        AND (Ubicacion LIKE '%Matriz%' OR Ubicacion LIKE '%Clinica%' OR Ubicacion LIKE '%Tecamachalco%')
+      GROUP BY CpnyID, BrandDescr, Modelo, Version, Anio, Color, VIN, Ubicacion
     `);
 
-    // Construir mapa de inventario: CpnyId|SubMarcaNormalizada -> { QtyAF, QtyAP }
-    // Agregamos por modelo normalizado para consolidar todos los trims del mismo modelo
-    type InvRow = { CpnyId: string; SubBrandDescr: string; QtyAF: number; QtyAP: number };
-    const invMap = new Map<string, { QtyAF: number; QtyAP: number }>();
+    type InvRow = { CpnyId: string; Marca: string; SubMarca: string; Version: string; Anio: number; Color: string; VIN: string; Ubicacion: string } & InventoryTotals;
+    const invMap = new Map<string, InvRow>();
     for (const inv of invResult.recordset as InvRow[]) {
-      const modelo = normalizeSubBrand(inv.CpnyId, inv.SubBrandDescr);
-      const key = `${inv.CpnyId.toLowerCase()}|${modelo}`;
-      const existing = invMap.get(key);
-      if (existing) {
-        existing.QtyAF += inv.QtyAF;
-        existing.QtyAP += inv.QtyAP;
-      } else {
-        invMap.set(key, { QtyAF: inv.QtyAF, QtyAP: inv.QtyAP });
-      }
+      const key = [norm(inv.CpnyId), norm(inv.Marca), norm(inv.SubMarca), norm(inv.Version), Number(inv.Anio), norm(inv.Color), norm(inv.VIN)].join('|');
+      invMap.set(key, inv);
     }
 
-    // Asignar inventario: solo la primera fila de cada grupo CpnyId|SubMarca recibe el total
-    // Las filas subsecuentes reciben 0 para evitar duplicacion en sumatorias
-    const keyUsed = new Set<string>();
-    const ventasRows = ventasResult.recordset as Record<string, unknown>[];
-
-    const merged = ventasRows.map(v => {
-      const cpny   = String(v['CpnyId']  ?? '').trim().toLowerCase();
-      const modelo = String(v['SubMarca'] ?? '').trim().toLowerCase();
-      const key    = `${cpny}|${modelo}`;
-      const inv    = invMap.get(key);
-      if (inv && !keyUsed.has(key)) {
-        keyUsed.add(key);
-        return {
-          ...v,
-          QtyAF: inv.QtyAF,
-          QtyAP: inv.QtyAP,
-          Inventario: inv.QtyAF + inv.QtyAP,
-        };
-      }
-      return {
-        ...v,
-        QtyAF: 0,
-        QtyAP: 0,
-        Inventario: 0,
-      };
-    });
-
-    return merged.map(normalizeRow);
+    return (ventasResult.recordset as Record<string, unknown>[]).map(v => {
+      const base = { ...v, QtyAF: 0, QtyAP: 0, Inventario: 0 };
+      const candidates = [...invMap.values()].filter(inv => norm(inv.CpnyId) === norm(v.CpnyId) && norm(inv.SubMarca) === norm(v.SubMarca) && Number(inv.Anio) === Number(v.Anio) && (!norm(v.Color) || norm(inv.Color) === norm(v.Color)));
+      const total = candidates.reduce((n, inv) => n + inv.QtyAF + inv.QtyAP + inv.QtyAD + inv.QtyDP, 0);
+      const af = candidates.reduce((n, inv) => n + inv.QtyAF, 0);
+      const ap = candidates.reduce((n, inv) => n + inv.QtyAP, 0);
+      return { ...base, QtyAF: af, QtyAP: ap, Inventario: total };
+    }).map(normalizeRow);
   } finally {
     await poolIntranet.close().catch(() => {});
-    await poolBSC.close().catch(() => {});
+    await poolInventory.close().catch(() => {});
   }
 }
