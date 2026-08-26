@@ -58,6 +58,8 @@ const clinicInventoryConfig: sql.config = {
   requestTimeout: 30_000,
 };
 
+type InventoryTotals = { QtyAF: number; QtyAP: number; QtyAD: number; QtyDP: number };
+
 export async function getVentasYakimura(): Promise<VentaRow[]> {
   const poolIntranet = new sql.ConnectionPool(makeConfig('Intranet'));
   const poolInventory = new sql.ConnectionPool(clinicInventoryConfig);
@@ -105,14 +107,16 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
         LTRIM(RTRIM(CpnyID)) AS CpnyId,
         LTRIM(RTRIM(SubBrandDescr)) AS SubBrandDescr,
         SUM(ISNULL(QtyAF, 0)) AS QtyAF,
-        SUM(ISNULL(QtyAP, 0)) AS QtyAP
+        SUM(ISNULL(QtyAP, 0)) AS QtyAP,
+        SUM(ISNULL(QtyAD, 0)) AS QtyAD,
+        SUM(ISNULL(QtyDP, 0)) AS QtyDP
       FROM Inventory
-      WHERE QtyAF > 0 OR QtyAP > 0 OR QtyDP > 0 OR QtyAD > 0
+      WHERE QtyAF > 0 OR QtyAP > 0 OR QtyAD > 0 OR QtyDP > 0
       GROUP BY LTRIM(RTRIM(CpnyID)), LTRIM(RTRIM(SubBrandDescr))
     `);
 
-    type InvRow = { CpnyId: string; SubBrandDescr: string; QtyAF: number; QtyAP: number };
-    const invMap = new Map<string, { QtyAF: number; QtyAP: number }>();
+    type InvRow = { CpnyId: string; SubBrandDescr: string } & InventoryTotals;
+    const invMap = new Map<string, InventoryTotals>();
 
     for (const inv of invResult.recordset as InvRow[]) {
       const modelo = normalizeSubBrand(inv.SubBrandDescr);
@@ -121,8 +125,15 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
       if (existing) {
         existing.QtyAF += inv.QtyAF;
         existing.QtyAP += inv.QtyAP;
+        existing.QtyAD += inv.QtyAD;
+        existing.QtyDP += inv.QtyDP;
       } else {
-        invMap.set(key, { QtyAF: inv.QtyAF, QtyAP: inv.QtyAP });
+        invMap.set(key, {
+          QtyAF: inv.QtyAF,
+          QtyAP: inv.QtyAP,
+          QtyAD: inv.QtyAD,
+          QtyDP: inv.QtyDP,
+        });
       }
     }
 
@@ -136,7 +147,12 @@ export async function getVentasYakimura(): Promise<VentaRow[]> {
 
       if (inv && !keyUsed.has(key)) {
         keyUsed.add(key);
-        return { ...v, QtyAF: inv.QtyAF, QtyAP: inv.QtyAP, Inventario: inv.QtyAF + inv.QtyAP };
+        return {
+          ...v,
+          QtyAF: inv.QtyAF,
+          QtyAP: inv.QtyAP,
+          Inventario: inv.QtyAF + inv.QtyAP + inv.QtyAD + inv.QtyDP,
+        };
       }
 
       return { ...v, QtyAF: 0, QtyAP: 0, Inventario: 0 };
