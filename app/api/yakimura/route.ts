@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getInventory } from '../../lib/db';
+import { getVentasYakimura } from '../../lib/db_ventas';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
-    const result = await getInventory();
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error('Error en API Yakimura:', error);
+    const data = await getVentasYakimura();
+    return NextResponse.json(data);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Error desconocido';
     return NextResponse.json(
-      { error: 'Error al consultar datos Yakimura' },
+      { error: 'Error de conexión SQL', details: msg },
       { status: 500 }
     );
   }
