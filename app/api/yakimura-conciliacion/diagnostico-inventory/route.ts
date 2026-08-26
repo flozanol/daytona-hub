@@ -25,12 +25,18 @@ export async function GET() {
       ORDER BY ORDINAL_POSITION
     `);
 
-    const sample = await pool.request().query('SELECT TOP 1 * FROM Inventory');
+    const sample = await pool.request().query(`
+      SELECT TOP 20
+        CpnID, BrandDescr, SubBrandDescr, ModeloYr, Color,
+        QtyAD, QtyAF, QtyAP, QtyDP
+      FROM Inventory
+      ORDER BY CpnID, BrandDescr, SubBrandDescr, ModeloYr, Color
+    `);
 
     return NextResponse.json({
       table: 'Inventory',
       columns: columns.recordset,
-      sampleKeys: sample.recordset[0] ? Object.keys(sample.recordset[0]) : [],
+      sample: sample.recordset,
     });
   } catch (error) {
     return NextResponse.json(
