@@ -25,18 +25,23 @@ export async function GET() {
       ORDER BY ORDINAL_POSITION
     `);
 
-    const sample = await pool.request().query(`
-      SELECT TOP 20
-        CpnID, BrandDescr, SubBrandDescr, ModeloYr, Color,
-        QtyAD, QtyAF, QtyAP, QtyDP
-      FROM Inventory
-      ORDER BY CpnID, BrandDescr, SubBrandDescr, ModeloYr, Color
-    `);
+    const sample = await pool.request().query('SELECT TOP 20 * FROM Inventory');
+    const rows = sample.recordset.map((row: Record<string, unknown>) => {
+      const selected: Record<string, unknown> = {};
+      for (const key of [
+        'CpnID', 'CpnyID', 'BrandDescr', 'SubBrandDescr', 'Color',
+        'Modelo', 'Model', 'ModelYear', 'ModelYr', 'ModeloYear',
+        'QtyAD', 'QtyAF', 'QtyAP', 'QtyDP', 'Ubicacion', 'SiteName',
+      ]) {
+        if (Object.prototype.hasOwnProperty.call(row, key)) selected[key] = row[key];
+      }
+      return selected;
+    });
 
     return NextResponse.json({
       table: 'Inventory',
       columns: columns.recordset,
-      sample: sample.recordset,
+      sample: rows,
     });
   } catch (error) {
     return NextResponse.json(
