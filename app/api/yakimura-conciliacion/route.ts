@@ -10,11 +10,11 @@ const number = (value: unknown) => Number(value ?? 0) || 0;
 const quantity = (row: any) => number(row.QtyAD) + number(row.QtyAF) + number(row.QtyAP) + number(row.QtyDP);
 
 const inventoryKey = (row: any) => [
-  norm(row.CpnID),
+  norm(row.CpnyID),
   norm(row.BrandDescr),
-  norm(row.SubBrandDescr),
-  norm(row.VersionDescr),
-  number(row.ModelYr),
+  norm(row.Modelo),
+  norm(row.Version),
+  number(row.Anio),
   norm(row.Color),
 ].join('|');
 
@@ -31,13 +31,12 @@ export async function GET() {
   try {
     const [inventoryRows, salesRows] = await Promise.all([getInventory(), getVentasYakimuraDetalle()]);
     const inventory = (Array.isArray(inventoryRows) ? inventoryRows : []).filter((row: any) =>
-      /matriz|clinica|tecamachalco/i.test(String(row.SiteName ?? '')),
+      /matriz|clinica|tecamachalco/i.test(String(row.Ubicacion ?? '')),
     );
     const sales = Array.isArray(salesRows) ? salesRows : [];
     const activeSales = sales.filter((row: any) =>
       number(row.Periodo_Menos_3) + number(row.Periodo_Menos_2) + number(row.Periodo_Menos_1) + number(row.Periodo_Actual) > 0,
     );
-
     const salesKeys = new Set(activeSales.map(salesKey));
     const matched = inventory.filter((row: any) => salesKeys.has(inventoryKey(row)));
     const unmatched = inventory.filter((row: any) => !salesKeys.has(inventoryKey(row)));
@@ -48,8 +47,8 @@ export async function GET() {
       totalInventario: sum(inventory),
       emparejado: sum(matched),
       sinHistorico: sum(unmatched),
-      financiados: inventory.filter((row: any) => /financiados/i.test(String(row.SiteName ?? ''))).length,
-      propios: inventory.filter((row: any) => /propia|matriz/i.test(String(row.SiteName ?? ''))).length,
+      financiados: inventory.filter((row: any) => /financiados/i.test(String(row.Ubicacion ?? ''))).length,
+      propios: inventory.filter((row: any) => /propia|matriz/i.test(String(row.Ubicacion ?? ''))).length,
       longitudes: {
         inventario: inventory.length,
         ventas: sales.length,
