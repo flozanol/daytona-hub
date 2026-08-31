@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grupo Daytona · Dashboard de Marketing</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good:           #006300;
+
+    --s1: #2a78d6; /* blue    */
+    --s2: #eb6834; /* orange  */
+    --s3: #1baf7a; /* aqua    */
+    --s4: #eda100; /* yellow  */
+    --s5: #e87ba4; /* magenta */
+    --s6: #008300; /* green   */
+    --s7: #4a3aa7; /* violet  */
+    --s8: #e34948; /* red     */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
+      --text-muted:#898781; --grid:#2c2c2a; --baseline:#383835; --border: rgba(255,255,255,0.10);
+      --good:#0ca30c;
+      --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
+    --text-muted:#898781; --grid:#2c2c2a; --baseline:#383835; --border: rgba(255,255,255,0.10);
+    --good:#0ca30c;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+  }
+  header { padding: 24px 28px 8px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--text-secondary); font-size: 13px; }
+
+  .wrap { padding: 0 28px 40px; max-width: 1400px; margin: 0 auto; }
+
+  .filters {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px; margin: 16px 0 20px;
+  }
+  .filters label { font-size: 12px; color: var(--text-secondary); margin-right: 6px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    border: none; background: var(--surface-1); color: var(--text-secondary);
+    padding: 6px 12px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .seg button.active { background: var(--s1); color: #fff; }
+  select, .chip-btn {
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1);
+    color: var(--text-primary); padding: 6px 10px; font-size: 13px; font-family: inherit; cursor: pointer;
+  }
+  .chip-group { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip-btn.active { background: var(--s1); color:#fff; border-color: var(--s1); }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .kpi .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .kpi .value { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .kpi .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; grid-column: span 12;
+  }
+  .card h2 { font-size: 14px; margin: 0 0 2px; }
+  .card .desc { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+  .col-6 { grid-column: span 6; }
+  .col-8 { grid-column: span 8; }
+  .col-4 { grid-column: span 4; }
+  @media (max-width: 900px) { .col-6, .col-8, .col-4 { grid-column: span 12; } }
+
+  .chart-box { position: relative; height: 300px; }
+  .chart-box.tall { height: 380px; }
+  .chart-box.short { height: 220px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); }
+  th { color: var(--text-secondary); font-weight: 600; font-size: 12px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:hover { background: rgba(42,120,214,0.06); }
+
+  .legend { display:flex; flex-wrap:wrap; gap: 10px 16px; font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+  .legend .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+
+  .funnel-row { display:flex; align-items:center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .funnel-label { width: 190px; flex-shrink:0; color: var(--text-secondary); }
+  .funnel-bar-track { flex:1; background: var(--grid); border-radius: 4px; height: 22px; overflow:hidden; }
+  .funnel-bar-fill { background: var(--s1); height: 100%; border-radius: 4px; }
+  .funnel-count { width: 130px; text-align:right; flex-shrink:0; font-variant-numeric: tabular-nums; }
+
+  footer { color: var(--text-muted); font-size: 11px; padding: 20px 28px 40px; }
+  a { color: var(--s1); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Grupo Daytona · Dashboard de Marketing</h1>
+  <div class="subtitle" id="subtitle">Cargando datos…</div>
+</header>
+<div class="wrap">
+
+  <div class="filters">
+    <div>
+      <label>Marca</label>
+      <div class="seg" id="filter-marca"></div>
+    </div>
+    <div>
+      <label>Mes</label>
+      <select id="filter-mes"></select>
+    </div>
+    <div style="flex:1"></div>
+    <div>
+      <label>Agencias</label>
+      <div class="chip-group" id="filter-agencia"></div>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="card col-8">
+      <h2>Leads por día</h2>
+      <div class="desc">Volumen diario de leads generados en el periodo filtrado, por agencia.</div>
+      <div class="chart-box tall"><canvas id="chart-trend"></canvas></div>
+    </div>
+    <div class="card col-4">
+      <h2>Leads por agencia</h2>
+      <div class="desc">Volumen total y % en estado "Contactado" o más avanzado.</div>
+      <div class="chart-box tall"><canvas id="chart-agencia"></canvas></div>
+    </div>
+
+    <div class="card col-6">
+      <h2>Embudo de conversión</h2>
+      <div class="desc">Del total de leads filtrados, cuántos llegan a cada etapa. "Finalizado" = gestión cerrada sin venta.</div>
+      <div id="funnel"></div>
+    </div>
+    <div class="card col-6">
+      <h2>Leads por fuente</h2>
+      <div class="desc">Volumen por canal y su distribución de temperatura (calidad del lead).</div>
+      <div class="chart-box tall"><canvas id="chart-fuente"></canvas></div>
+    </div>
+
+    <div class="card col-6">
+      <h2>Interés por modelo — MG</h2>
+      <div class="desc">Top modelos por volumen de leads.</div>
+      <div class="chart-box"><canvas id="chart-producto-mg"></canvas></div>
+    </div>
+    <div class="card col-6">
+      <h2>Interés por modelo — Honda</h2>
+      <div class="desc">Top modelos por volumen de leads.</div>
+      <div class="chart-box"><canvas id="chart-producto-honda"></canvas></div>
+    </div>
+
+    <div class="card col-6">
+      <h2>Velocidad de respuesta</h2>
+      <div class="desc">Minutos desde que entra el lead hasta el primer contacto, por agencia (mediana).</div>
+      <div class="chart-box short"><canvas id="chart-respuesta"></canvas></div>
+    </div>
+    <div class="card col-6">
+      <h2>Motivos de leads no convertidos</h2>
+      <div class="desc">Solo leads en estado Finalizado o Abandonado, según el último seguimiento capturado.</div>
+      <div class="chart-box short"><canvas id="chart-motivo"></canvas></div>
+    </div>
+
+    <div class="card col-12">
+      <h2>Desempeño por asesor</h2>
+      <div class="desc">Ordenado por leads asignados. "Contactado+" incluye Contactado, Finalizado, Abandonado y Venta.</div>
+      <div style="overflow-x:auto">
+        <table id="tabla-asesor">
+          <thead>
+            <tr>
+              <th>Asesor</th><th>Agencia</th>
+              <th class="num">Leads</th><th class="num">Tiempo resp. mediana</th>
+              <th class="num">% Contactado+</th><th class="num">Citas agendadas</th>
+              <th class="num">Ventas</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<footer id="footer"></footer>
+
+<script>
+const PALETTE = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'].map(v =>
+  getComputedStyle(document.documentElement).getPropertyValue(v).trim());
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+// color asignado por dimension+valor, en orden de primera aparicion, ciclando solo si hay >8 categorias
+const colorMaps = {};
+function colorFor(dimension, key){
+  if(!colorMaps[dimension]) colorMaps[dimension] = new Map();
+  const m = colorMaps[dimension];
+  if(!m.has(key)) m.set(key, PALETTE[m.size % PALETTE.length]);
+  return m.get(key);
+}
+// colores fijos para temperatura (frio->caliente, mismo criterio en todos los charts)
+const TEMP_COLOR = { 'Frio': cssVar('--s1'), 'Tibio': cssVar('--s4'), 'Caliente': cssVar('--s8') };
+const MARCA_COLOR = { 'MG': cssVar('--s1'), 'Honda': cssVar('--s2') };
+
+Chart.defaults.font.family = "system-ui, -apple-system, 'Segoe UI', sans-serif";
+Chart.defaults.color = cssVar('--text-secondary');
+Chart.defaults.borderColor = cssVar('--grid');
+
+let DATA = null;
+let charts = {};
+const state = { marca: 'Todas', mes: 'Todos', agencias: new Set() };
+
+function median(arr){
+  const a = arr.filter(x => x!=null).sort((x,y)=>x-y);
+  if(!a.length) return null;
+  const mid = Math.floor(a.length/2);
+  return a.length % 2 ? a[mid] : (a[mid-1]+a[mid])/2;
+}
+function percentile(arr, p){
+  const a = arr.filter(x => x!=null).sort((x,y)=>x-y);
+  if(!a.length) return null;
+  const idx = Math.min(a.length-1, Math.floor(a.length*p));
+  return a[idx];
+}
+function fmtMin(m){
+  if(m==null) return '—';
+  if(m < 1) return Math.round(m*60)+' seg';
+  if(m < 60) return (m<10 ? m.toFixed(1) : Math.round(m))+' min';
+  return (m/60).toFixed(1)+' h';
+}
+function pct(n, d){ return d ? (100*n/d) : 0; }
+function fmtN(n){ return n.toLocaleString('es-MX'); }
+
+fetch('data/dashboard_data.json').then(r => r.json()).then(d => {
+  DATA = d;
+  state.agencias = new Set(d.agencias.map(a => a.agencia));
+  document.getElementById('subtitle').textContent =
+    `${fmtN(d.leads.length)} leads · ${d.agencias.length} agencias · corte: ${d.months.join(', ')} · generado ${new Date(d.generated_at).toLocaleString('es-MX')}`;
+  document.getElementById('footer').innerHTML =
+    'Datos de origen: reportes de leads del CRM por agencia. "Ventas" refleja solo lo capturado en este reporte — el cierre real puede vivir en otro sistema (DMS). ' +
+    'Para agregar el siguiente mes: coloca los CSV nuevos en <code>data_raw/AAAA-MM/</code> y corre <code>scripts/build.py</code>.';
+
+  buildMarcaFilter();
+  buildMesFilter();
+  buildAgenciaFilter();
+  render();
+});
+
+function buildMarcaFilter(){
+  const marcas = ['Todas', ...Array.from(new Set(DATA.agencias.map(a=>a.marca))).sort()];
+  const box = document.getElementById('filter-marca');
+  box.innerHTML = '';
+  marcas.forEach(m => {
+    const b = document.createElement('button');
+    b.textContent = m; b.className = m===state.marca ? 'active':'';
+    b.onclick = () => { state.marca = m; syncAgenciaVisibility(); render(); highlightSeg(); };
+    box.appendChild(b);
+  });
+}
+function highlightSeg(){
+  document.querySelectorAll('#filter-marca button').forEach(b => b.classList.toggle('active', b.textContent===state.marca));
+}
+function buildMesFilter(){
+  const sel = document.getElementById('filter-mes');
+  sel.innerHTML = '<option value="Todos">Todos</option>' + DATA.months.map(m=>`<option value="${m}">${m}</option>`).join('');
+  sel.value = state.mes;
+  sel.onchange = () => { state.mes = sel.value; render(); };
+}
+function buildAgenciaFilter(){
+  const box = document.getElementById('filter-agencia');
+  box.innerHTML = '';
+  DATA.agencias.forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'chip-btn active';
+    b.textContent = a.agencia;
+    b.dataset.marca = a.marca;
+    b.onclick = () => {
+      if(state.agencias.has(a.agencia)) state.agencias.delete(a.agencia); else state.agencias.add(a.agencia);
+      b.classList.toggle('active');
+      render();
+    };
+    box.appendChild(b);
+  });
+  syncAgenciaVisibility();
+}
+function syncAgenciaVisibility(){
+  document.querySelectorAll('#filter-agencia .chip-btn').forEach(b => {
+    b.style.display = (state.marca === 'Todas' || b.dataset.marca === state.marca) ? '' : 'none';
+  });
+}
+
+function filteredLeads(){
+  return DATA.leads.filter(l =>
+    (state.marca === 'Todas' || l.marca === state.marca) &&
+    (state.mes === 'Todos' || l.mes === state.mes) &&
+    state.agencias.has(l.agencia)
+  );
+}
+
+function render(){
+  const leads = filteredLeads();
+  renderKPIs(leads);
+  renderTrend(leads);
+  renderAgencia(leads);
+  renderFunnel(leads);
+  renderFuente(leads);
+  renderProducto(leads);
+  renderRespuesta(leads);
+  renderMotivo(leads);
+  renderAsesorTable(leads);
+}
+
+function renderKPIs(leads){
+  const total = leads.length;
+  const ventas = leads.filter(l=>l.es_venta).length;
+  const contactadoPlus = leads.filter(l => !['1. Sin Atender','2. Asignado'].includes(l.estatus)).length;
+  const calientes = leads.filter(l=>l.temperatura==='Caliente').length;
+  const tRespuesta = median(leads.map(l=>l.tiempo_respuesta_min));
+  const citas = leads.reduce((s,l)=>s+l.citas_agendadas,0);
+
+  const kpis = [
+    { label:'Leads totales', value: fmtN(total), hint: `${state.agencias.size} agencia(s)` },
+    { label:'Tasa de contacto', value: pct(contactadoPlus,total).toFixed(1)+'%', hint: `${fmtN(contactadoPlus)} de ${fmtN(total)}` },
+    { label:'Ventas cerradas (en CRM)', value: fmtN(ventas), hint: `${pct(ventas,total).toFixed(2)}% de los leads` },
+    { label:'Tiempo mediano 1ᵉʳ contacto', value: fmtMin(tRespuesta), hint:'desde alta del lead (muchas respuestas son bot automático)' },
+    { label:'Leads "Caliente"', value: pct(calientes,total).toFixed(1)+'%', hint: `${fmtN(calientes)} leads` },
+    { label:'Citas agendadas', value: fmtN(citas), hint: `${pct(citas,total).toFixed(1)}% de los leads` },
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k =>
+    `<div class="kpi"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="hint">${k.hint}</div></div>`
+  ).join('');
+}
+
+function destroy(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+
+function renderTrend(leads){
+  destroy('trend');
+  const byAgenciaDay = {};
+  leads.forEach(l => {
+    if(!l.fecha_alta) return;
+    const day = l.fecha_alta.slice(0,10);
+    byAgenciaDay[l.agencia] = byAgenciaDay[l.agencia] || {};
+    byAgenciaDay[l.agencia][day] = (byAgenciaDay[l.agencia][day]||0)+1;
+  });
+  const days = Array.from(new Set(leads.filter(l=>l.fecha_alta).map(l=>l.fecha_alta.slice(0,10)))).sort();
+  const datasets = Object.keys(byAgenciaDay).sort().map(ag => ({
+    label: ag,
+    data: days.map(d => byAgenciaDay[ag][d]||0),
+    borderColor: colorFor('agencia', ag),
+    backgroundColor: colorFor('agencia', ag),
+    borderWidth: 2, pointRadius: 0, tension: 0.15,
+  }));
+  charts.trend = new Chart(document.getElementById('chart-trend'), {
+    type:'line',
+    data:{ labels: days.map(d=>d.slice(5)), datasets },
+    options:{
+      maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10 } } },
+      scales:{ x:{ grid:{ display:false } }, y:{ beginAtZero:true, grid:{ color: cssVar('--grid') } } }
+    }
+  });
+}
+
+function renderAgencia(leads){
+  destroy('agencia');
+  const ags = Array.from(new Set(leads.map(l=>l.agencia))).sort();
+  const totals = ags.map(a => leads.filter(l=>l.agencia===a).length);
+  charts.agencia = new Chart(document.getElementById('chart-agencia'), {
+    type:'bar',
+    data:{ labels: ags, datasets:[{ data: totals, backgroundColor: ags.map(a=>colorFor('agencia',a)), borderRadius:4, maxBarThickness: 40 }] },
+    options:{
+      maintainAspectRatio:false, indexAxis:'y',
+      plugins:{ legend:{ display:false } },
+      scales:{ x:{ beginAtZero:true, grid:{ color: cssVar('--grid') } }, y:{ grid:{ display:false } } }
+    }
+  });
+}
+
+const FUNNEL_STAGES = ['1. Sin Atender','2. Asignado','3. Contactado','4. Finalizado (sin venta)','5. Abandonado (sin venta)','6. Venta Ganada'];
+function renderFunnel(leads){
+  const total = leads.length || 1;
+  const box = document.getElementById('funnel');
+  box.innerHTML = FUNNEL_STAGES.map(stage => {
+    const n = leads.filter(l=>l.estatus===stage).length;
+    const w = Math.max(pct(n,total),1.5);
+    const label = stage.replace(/^\d\.\s*/,'');
+    return `<div class="funnel-row">
+      <div class="funnel-label">${label}</div>
+      <div class="funnel-bar-track"><div class="funnel-bar-fill" style="width:${w}%; background:${stage.startsWith('6')?cssVar('--good'):cssVar('--s1')}"></div></div>
+      <div class="funnel-count">${fmtN(n)} · ${pct(n,total).toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+}
+
+function renderFuente(leads){
+  destroy('fuente');
+  const fuentes = Array.from(new Set(leads.map(l=>l.fuente).filter(Boolean)));
+  const counts = fuentes.map(f => leads.filter(l=>l.fuente===f).length);
+  const order = fuentes.map((f,i)=>i).sort((a,b)=>counts[b]-counts[a]);
+  const fuentesSorted = order.map(i=>fuentes[i]);
+  const temps = ['Frio','Tibio','Caliente'];
+  const datasets = temps.map(t => ({
+    label: t,
+    data: fuentesSorted.map(f => leads.filter(l=>l.fuente===f && l.temperatura===t).length),
+    backgroundColor: TEMP_COLOR[t],
+    borderRadius: 3,
+  }));
+  charts.fuente = new Chart(document.getElementById('chart-fuente'), {
+    type:'bar',
+    data:{ labels: fuentesSorted.map(f=>f.replace(/^\d+\./,'')), datasets },
+    options:{
+      maintainAspectRatio:false, indexAxis:'y',
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10 } } },
+      scales:{ x:{ stacked:true, beginAtZero:true, grid:{ color: cssVar('--grid') } }, y:{ stacked:true, grid:{ display:false } } }
+    }
+  });
+}
+
+function topProducto(leads, marca, n=12){
+  const rows = leads.filter(l=>l.marca===marca && l.producto!=='No especificado' && !l.producto.startsWith('Dato inválido'));
+  const counts = {};
+  rows.forEach(l => counts[l.producto] = (counts[l.producto]||0)+1);
+  const arr = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const top = arr.slice(0,n);
+  const restSum = arr.slice(n).reduce((s,[,c])=>s+c,0);
+  if(restSum>0) top.push(['Otros', restSum]);
+  return top;
+}
+function renderProducto(leads){
+  destroy('prod-mg'); destroy('prod-honda');
+  const mg = topProducto(leads,'MG');
+  const honda = topProducto(leads,'Honda');
+  charts['prod-mg'] = new Chart(document.getElementById('chart-producto-mg'), {
+    type:'bar',
+    data:{ labels: mg.map(x=>x[0]), datasets:[{ data: mg.map(x=>x[1]), backgroundColor: cssVar('--s1'), borderRadius:4 }] },
+    options:{ maintainAspectRatio:false, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true, grid:{color:cssVar('--grid')}}, y:{grid:{display:false}}} }
+  });
+  charts['prod-honda'] = new Chart(document.getElementById('chart-producto-honda'), {
+    type:'bar',
+    data:{ labels: honda.map(x=>x[0]), datasets:[{ data: honda.map(x=>x[1]), backgroundColor: cssVar('--s2'), borderRadius:4 }] },
+    options:{ maintainAspectRatio:false, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true, grid:{color:cssVar('--grid')}}, y:{grid:{display:false}}} }
+  });
+}
+
+function renderRespuesta(leads){
+  destroy('respuesta');
+  const ags = Array.from(new Set(leads.map(l=>l.agencia))).sort();
+  const meds = ags.map(a => median(leads.filter(l=>l.agencia===a).map(l=>l.tiempo_respuesta_min)));
+  const p75s = ags.map(a => percentile(leads.filter(l=>l.agencia===a).map(l=>l.tiempo_respuesta_min), 0.75));
+  charts.respuesta = new Chart(document.getElementById('chart-respuesta'), {
+    type:'bar',
+    data:{ labels: ags, datasets:[
+      { label:'Mediana', data: meds, backgroundColor: cssVar('--s1'), borderRadius:4, maxBarThickness:32 },
+      { label:'P75 (peor 1 de 4)', data: p75s, backgroundColor: cssVar('--s4'), borderRadius:4, maxBarThickness:32 },
+    ]},
+    options:{
+      maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom', labels:{boxWidth:10}}, tooltip:{ callbacks:{ label: c => `${c.dataset.label}: ${fmtMin(c.parsed.y)}` } } },
+      scales:{ x:{ grid:{ display:false } }, y:{ beginAtZero:true, grid:{ color: cssVar('--grid') }, title:{ display:true, text:'minutos' } } }
+    }
+  });
+}
+
+function renderMotivo(leads){
+  destroy('motivo');
+  const cerrados = leads.filter(l => l.estatus==='4. Finalizado (sin venta)' || l.estatus==='5. Abandonado (sin venta)');
+  const counts = {};
+  cerrados.forEach(l => counts[l.motivo] = (counts[l.motivo]||0)+1);
+  const arr = Object.entries(counts).sort((a,b)=>b[1]-a[1]).filter(([k])=>k!=='Lead recién asignado');
+  charts.motivo = new Chart(document.getElementById('chart-motivo'), {
+    type:'bar',
+    data:{ labels: arr.map(x=>x[0]), datasets:[{ data: arr.map(x=>x[1]), backgroundColor: cssVar('--s8'), borderRadius:4 }] },
+    options:{ maintainAspectRatio:false, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true, grid:{color:cssVar('--grid')}}, y:{grid:{display:false}}} }
+  });
+}
+
+function renderAsesorTable(leads){
+  const byAsesor = {};
+  leads.forEach(l => {
+    const key = l.asesor + '||' + l.agencia;
+    byAsesor[key] = byAsesor[key] || { asesor:l.asesor, agencia:l.agencia, leads:[] };
+    byAsesor[key].leads.push(l);
+  });
+  const rows = Object.values(byAsesor).map(g => {
+    const total = g.leads.length;
+    const contactadoPlus = g.leads.filter(l => !['1. Sin Atender','2. Asignado'].includes(l.estatus)).length;
+    const citas = g.leads.reduce((s,l)=>s+l.citas_agendadas,0);
+    const ventas = g.leads.filter(l=>l.es_venta).length;
+    return {
+      asesor: g.asesor, agencia: g.agencia, total,
+      tMed: median(g.leads.map(l=>l.tiempo_respuesta_min)),
+      pctContactado: pct(contactadoPlus,total),
+      citas, ventas,
+    };
+  }).sort((a,b)=>b.total-a.total);
+
+  document.querySelector('#tabla-asesor tbody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.asesor}</td><td>${r.agencia}</td>
+      <td class="num">${fmtN(r.total)}</td>
+      <td class="num">${fmtMin(r.tMed)}</td>
+      <td class="num">${r.pctContactado.toFixed(0)}%</td>
+      <td class="num">${fmtN(r.citas)}</td>
+      <td class="num">${fmtN(r.ventas)}</td>
+    </tr>`).join('');
+}
+</script>
+</body>
+</html>

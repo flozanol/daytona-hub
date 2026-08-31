@@ -1,0 +1,48 @@
+marca,valor_normalizado,propuesta_canonica
+MG,,No especificado
+MG,ehs,HS EV
+MG,hs,HS
+MG,hshev,HS HEV
+MG,hsnueva,HS
+MG,hsphev,HS PHEV
+MG,mg gt,MG GT
+MG,mg3,MG3
+MG,mg3 hybrid,MG3 Hybrid
+MG,mg4,MG4
+MG,mg5 mce,MG5 MCE
+MG,mg7,MG7
+MG,mgimls7,MG IM LS7
+MG,no envian producto valido,No especificado
+MG,nueva zs,ZS
+MG,p9,MG P9
+MG,rx5,RX5
+MG,rx8,RX8
+MG,rx9,RX9
+MG,zs,ZS
+MG,zsev,ZS EV
+MG,zshev,ZS HEV
+Honda,,No especificado
+Honda,accord,Accord
+Honda,accord hybrid,Accord Hybrid
+Honda,acura adx,Acura ADX (REVISAR: ¿otra marca en este archivo?)
+Honda,br-v,BR-V
+Honda,brv,BR-V
+Honda,city,City
+Honda,civic,Civic
+Honda,civic hybrid,Civic Hybrid
+Honda,cr-v,CR-V
+Honda,cr-v hybrid,CR-V Hybrid
+Honda,crv,CR-V
+Honda,crv hev,CR-V Hybrid
+Honda,crv hybrid,CR-V Hybrid
+Honda,fit,Fit
+Honda,honda cr-v hev (híbrida),CR-V Hybrid
+Honda,hr-v,HR-V
+Honda,hrv,HR-V
+Honda,insight,Insight
+Honda,n-a,No especificado
+Honda,no envian producto valido,No especificado
+Honda,odyssey,Odyssey
+Honda,pilot,Pilot
+Honda,producto,Dato inválido (no es un producto)
+Honda,es,Dato inválido (no es un producto)
