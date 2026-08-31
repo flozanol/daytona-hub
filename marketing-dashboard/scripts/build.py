@@ -102,6 +102,76 @@ def is_invalid_producto(raw, key):
     return False
 
 
+def _compact(s):
+    """quita espacios y guiones para comparar contra pedazos de modelo, ej.
+    'cr-v touring cvt' y 'crv hibrida' deben reconocerse como el mismo modelo"""
+    return re.sub(r'[\s\-]', '', s)
+
+
+_HONDA_INVALID_HINTS = ['menos_de', 'mas_de', 'más_de', 'autofinanciamiento', 'facturacion']
+_HONDA_NO_MODEL_HINTS = ['autosdemo']
+_HYBRID_HINTS = ('hev', 'hybrid', 'hibrid')
+
+# (pedazo a buscar, nombre base, nombre version hibrida o None si el modelo no tiene)
+_HONDA_MODELS = [
+    ('crv', 'CR-V', 'CR-V Hybrid'),
+    ('hrv', 'HR-V', 'HR-V Hybrid'),
+    ('brv', 'BR-V', 'BR-V Hybrid'),
+    ('civic', 'Civic', 'Civic Hybrid'),
+    ('accord', 'Accord', 'Accord Hybrid'),
+    ('city', 'City', 'City Hybrid'),
+    ('odyssey', 'Odyssey', None),
+    ('pilot', 'Pilot', None),
+    ('fit', 'Fit', None),
+    ('insight', 'Insight', None),
+]
+# Acura es OTRA marca (aparece a veces mezclada en archivos de agencias Honda)
+_ACURA_MODELS = [
+    ('integra', 'Acura Integra'), ('rdx', 'Acura RDX'), ('adx', 'Acura ADX'),
+    ('mdx', 'Acura MDX'), ('tlx', 'Acura TLX'), ('zdx', 'Acura ZDX'), ('ilx', 'Acura ILX'),
+    ('acura', 'Acura (modelo sin identificar)'),
+]
+
+_MG_MODELS = [
+    # mas especifico primero
+    ('zsev', 'ZS EV'), ('zshev', 'ZS HEV'), ('zs', 'ZS'),
+    ('hsphev', 'HS PHEV'), ('hshev', 'HS HEV'), ('ehs', 'HS EV'), ('hs', 'HS'),
+    ('mg3hybrid', 'MG3 Hybrid'), ('mg3', 'MG3'),
+    ('mg4', 'MG4'), ('mg5mce', 'MG5 MCE'), ('mg5', 'MG5 MCE'), ('mg7', 'MG7'),
+    ('cyberster', 'MG Cyberster'),
+    ('rx5', 'RX5'), ('rx8', 'RX8'), ('rx9', 'RX9'),
+    ('mgimls7', 'MG IM LS7'), ('mggt', 'MG GT'), ('p9', 'MG P9'),
+]
+
+
+def guess_producto_base(marca, key):
+    """Cuando el valor exacto no esta en el mapeo (ej. una version/trim nueva
+    tipo 'cr-v touring cvt'), intenta reconocer el modelo base por palabras
+    clave, para no tener que mapear a mano cada variante nueva cada mes.
+    Devuelve None si no reconoce nada (y entonces si se marca para revisar)."""
+    kc = _compact(key)
+    if marca == 'Honda':
+        for hint in _HONDA_INVALID_HINTS:
+            if hint in key or hint in kc:
+                return 'Dato inválido (no es un producto)'
+        for hint in _HONDA_NO_MODEL_HINTS:
+            if hint in kc:
+                return 'No especificado'
+        for token, base, hybrid in _HONDA_MODELS:
+            if token in kc:
+                if hybrid and any(h in kc for h in _HYBRID_HINTS):
+                    return hybrid
+                return base
+        for token, name in _ACURA_MODELS:
+            if token in kc:
+                return f'{name} (REVISAR: otra marca en archivo Honda)'
+    elif marca == 'MG':
+        for token, name in _MG_MODELS:
+            if token in kc:
+                return name
+    return None
+
+
 LOST_REASON_RULES = [
     ("Incontactable / no contesta", r"incontactable|no contesta|ilocalizable|no localizable"),
     ("Sin interés / no compró", r"no pidi[oó]|sin inter[eé]s|no quiere|ya no le interesa"),
@@ -198,12 +268,22 @@ def process_month(month_dir, mapeo_producto, mapeo_estatus, mapeo_agencias):
                 if key in table:
                     producto_std = table[key]
                 else:
-                    producto_std = PENDIENTE
-                    append_pending(MAPEOS_DIR / "mapeo_producto.csv",
-                                    ["marca", "valor_normalizado", "propuesta_canonica"],
-                                    {"marca": marca, "valor_normalizado": key,
-                                     "propuesta_canonica": f"REVISAR: {producto_raw.strip()}"})
-                    mapeo_producto.setdefault(marca, {})[key] = PENDIENTE  # evita repetir el warning en esta corrida
+                    guessed = guess_producto_base(marca, key)
+                    if guessed:
+                        producto_std = guessed
+                        # se guarda para que quede documentado y sea editable a mano despues
+                        append_pending(MAPEOS_DIR / "mapeo_producto.csv",
+                                        ["marca", "valor_normalizado", "propuesta_canonica"],
+                                        {"marca": marca, "valor_normalizado": key,
+                                         "propuesta_canonica": guessed})
+                        mapeo_producto.setdefault(marca, {})[key] = guessed
+                    else:
+                        producto_std = PENDIENTE
+                        append_pending(MAPEOS_DIR / "mapeo_producto.csv",
+                                        ["marca", "valor_normalizado", "propuesta_canonica"],
+                                        {"marca": marca, "valor_normalizado": key,
+                                         "propuesta_canonica": f"REVISAR: {producto_raw.strip()}"})
+                        mapeo_producto.setdefault(marca, {})[key] = PENDIENTE  # evita repetir el warning en esta corrida
 
             estatus_raw = (r.get('Estatus', '') or '').strip()
             ekey = estatus_raw.lower()
