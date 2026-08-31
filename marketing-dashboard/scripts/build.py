@@ -126,6 +126,7 @@ _HONDA_MODELS = [
     ('insight', 'Insight', None),
 ]
 # Acura es OTRA marca (aparece a veces mezclada en archivos de agencias Honda)
+# Honda-Interlomas confirmo (ago-2026) que tambien maneja leads de Acura
 _ACURA_MODELS = [
     ('integra', 'Acura Integra'), ('rdx', 'Acura RDX'), ('adx', 'Acura ADX'),
     ('mdx', 'Acura MDX'), ('tlx', 'Acura TLX'), ('zdx', 'Acura ZDX'), ('ilx', 'Acura ILX'),
@@ -164,7 +165,7 @@ def guess_producto_base(marca, key):
                 return base
         for token, name in _ACURA_MODELS:
             if token in kc:
-                return f'{name} (REVISAR: otra marca en archivo Honda)'
+                return name
     elif marca == 'MG':
         for token, name in _MG_MODELS:
             if token in kc:

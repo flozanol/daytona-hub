@@ -24,7 +24,7 @@ MG,zshev,ZS HEV
 Honda,,No especificado
 Honda,accord,Accord
 Honda,accord hybrid,Accord Hybrid
-Honda,acura adx,Acura ADX (REVISAR: ¿otra marca en este archivo?)
+Honda,acura adx,Acura ADX
 Honda,br-v,BR-V
 Honda,brv,BR-V
 Honda,city,City
@@ -54,9 +54,9 @@ Honda,honda_br-v,BR-V
 Honda,honda_cr-v,CR-V
 Honda,autofinanciamiento,Dato inválido (no es un producto)
 Honda,city prime,City
-Honda,rdx,Acura RDX (REVISAR: otra marca en archivo Honda)
+Honda,rdx,Acura RDX
 Honda,facturacion,Dato inválido (no es un producto)
-Honda,integra types,Acura Integra (REVISAR: otra marca en archivo Honda)
+Honda,integra types,Acura Integra
 Honda,cr-v touring hev,CR-V Hybrid
 Honda,cr-v touring cvt,CR-V
 Honda,hr-v prime,HR-V
@@ -87,7 +87,7 @@ Honda,cr-v turbo cvt,CR-V
 Honda,civic sport plus 2d,Civic
 Honda,civic hev sport,Civic Hybrid
 Honda,accord sport plus,Accord
-Honda,integra,Acura Integra (REVISAR: otra marca en archivo Honda)
+Honda,integra,Acura Integra
 Honda,autos demo,No especificado
 Honda,hr v,HR-V
 Honda,honda city sport,City
