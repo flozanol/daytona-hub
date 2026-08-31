@@ -1,13 +1,8 @@
 # Los CSV originales que exporta el CRM (data_raw/AAAA-MM/) contienen datos
 # personales de cada cliente: nombre, telefono, correo. NUNCA deben subirse
-# a GitHub, sobre todo si el repositorio es publico o va a servir un sitio
-# con GitHub Pages. Se quedan solo en tu maquina / respaldo local.
+# al repositorio. Se quedan solo en tu maquina / respaldo local.
 # (data_raw/mapeos/ y data_raw/processed/ SI se versionan: ya no tienen PII.)
 data_raw/[0-9][0-9][0-9][0-9]-[0-9][0-9]/
-
-# Archivos de prueba local (no forman parte del sitio)
-docs/_test_vendor/
-docs/index_test.html
 
 # Sistema
 .DS_Store

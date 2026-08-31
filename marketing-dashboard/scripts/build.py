@@ -9,7 +9,7 @@ USO:
 Lee todos los CSV dentro de data_raw/<AAAA-MM>/ (uno por agencia, formato
 "ReporteFuentes..." exportado del CRM), los limpia y estandariza usando los
 mapeos editables en data_raw/mapeos/, actualiza el historico acumulado en
-data_raw/processed/leads_historico.csv, y regenera docs/data/dashboard_data.json
+data_raw/processed/leads_historico.csv, y regenera public/marketing-dashboard/data/dashboard_data.json
 (lo que consume el sitio).
 
 Para agregar un mes nuevo: crea la carpeta data_raw/AAAA-MM/, copia ahi los
@@ -34,7 +34,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RAW_DIR = ROOT / "data_raw"
 MAPEOS_DIR = RAW_DIR / "mapeos"
 PROCESSED_DIR = RAW_DIR / "processed"
-DOCS_DATA = ROOT / "docs" / "data"
+DOCS_DATA = ROOT.parent / "public" / "marketing-dashboard" / "data"  # carpeta que sirve Next.js/Vercel
 
 TEXT_COLS_TO_FIX = ['Titulo', 'Nombre', 'Comentario', 'Asesor', 'Campaña',
                      'SubCampaña', 'Ultimo Seguimiento', 'Producto']
